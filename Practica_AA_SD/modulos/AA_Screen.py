@@ -94,3 +94,6 @@ def create_map(alto,ancho):
         Strmap+="".join(map[i])
        
     return map, Strmap
+
+
+
