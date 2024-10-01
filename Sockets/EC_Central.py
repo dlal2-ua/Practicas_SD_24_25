@@ -1,4 +1,5 @@
 import socket
+<<<<<<< HEAD
 
 # Leer mapa de la ciudad y taxis
 def leer_mapa(fichero_mapa):
@@ -52,3 +53,13 @@ def iniciar_servidor():
         cliente_socket.close()
 
 iniciar_servidor()
+=======
+import sys
+
+
+
+if(len(sys.argv)==4):
+    print("Están bien los argumentos")
+else:
+    print("Los argumentos introducidos no son los correctos.El formato es: <Puerto de escucha> <IP y puerto del broker del gestor de colas> <IP y puerto de la BBDD>")
+>>>>>>> 4c894a59c92f77a17eb01a2930ab4c2df1ea2cc0
