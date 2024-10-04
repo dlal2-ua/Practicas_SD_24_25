@@ -2,7 +2,6 @@ import socket
 import sys
 
 HEADER = 64
-PORT = 5050
 FORMAT= 'utf-8'
 FIN = "FIN"
 
@@ -19,19 +18,30 @@ def send(msg):
 if(len(sys.argv)==3):
     print("Están bien los argumentos")
     SERVER = sys.argv[1]
-    PORT = sys.argv[2]
+    PORT = int(sys.argv[2])
     ADDR = (SERVER,PORT)
     client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     client.connect(ADDR)
-    msg ="jordi"
-    while msg != FIN:
-        msg=input()
+    aux=input()
+    while aux != FIN:
+        msg="KO"
+        print("Envío al servidor: ",msg)
         send(msg)
-        
-
-    
-
-
+        aux=input()
+        if aux == FIN:
+            msg = FIN
+            print("Envío al servidor: ",msg)
+            send(msg)
+            break
+        msg="OK"
+        print("Envío al servidor: ",msg)
+        send(msg)
+        aux=input()
+        if aux == FIN:
+            msg = FIN
+            print("Envío al servidor: ",msg)
+            send(msg)
+    client.close()
 else:
     print("Los argumentos introducidos no son los correctos.El formato es: <IP> <Puerto del EC_DE>")
 
