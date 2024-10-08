@@ -1,11 +1,15 @@
 import time
 from confluent_kafka import Producer  # Importa la librería Confluent Kafka para el productor
 from faker import Faker  # Faker es una librería para generar datos falsos
+import sqlite3
 
+
+""""
 # Configuración del productor
 conf = {
     'bootstrap.servers': '127.0.0.1:9092'  # Dirección del servidor Kafka, en este caso localhost
 }
+
 
 # Crea una instancia del productor con la configuración anterior
 producer = Producer(**conf)
@@ -13,7 +17,7 @@ fake = Faker()  # Instancia para generar datos falsos (nombres en este caso)
 
 # Función que actúa como callback para verificar si el mensaje fue entregado exitosamente o no
 def delivery_report(err, msg):
-    """Callback que informa si el mensaje fue enviado exitosamente o no."""
+    #Callback que informa si el mensaje fue enviado exitosamente o no.
     if err is not None:
         print(f"Error enviando el mensaje: {err}")  # Si hay un error, lo imprime
     else:
@@ -31,6 +35,7 @@ for _ in range(10):  # Bucle para enviar 10 mensajes
 # Asegura que todos los mensajes pendientes sean enviados antes de cerrar el productor
 producer.flush()
 print('***THE END***')  # Mensaje final para indicar que el proceso ha terminado
+
 
 #====================================================================
 
@@ -72,4 +77,5 @@ while True:
 # Asegura que todos los mensajes pendientes sean enviados antes de cerrar el productor
 producer.flush()
 print('***THE END***')  # Mensaje final para indicar que el proceso ha terminado
-"""
+
+#====================================================================
