@@ -12,17 +12,16 @@ FIN = "FIN"
 MAX_CONEXIONES = 1
 
 def handle_client(conn, addr):
-    connected = True
-    while connected:
-        msg_length = conn.recv(HEADER).decode(FORMAT)
-        if msg_length:
-            msg_length = int(msg_length)
-            msg = conn.recv(msg_length).decode(FORMAT)
-            while msg != FIN:
-                print(msg)
-                time.sleep(1)
-            connected = False
+    msg_length = int(conn.recv(HEADER).decode(FORMAT))
+    msg = conn.recv(msg_length).decode(FORMAT)
+    print(msg)
+    while msg != FIN:
+        msg_length = int(conn.recv(HEADER).decode(FORMAT))
+        msg = conn.recv(msg_length).decode(FORMAT)
+        print(msg)
+    print("Sale del while")
     conn.close()
+    exit(1)
 
 def start():
     server.listen()
