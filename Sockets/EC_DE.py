@@ -9,47 +9,55 @@ PORT = 5050
 ADDR=(SERVER,PORT)
 FORMAT = 'utf-8'
 FIN = "FIN"
-MAX_CONEXIONES = 1
 
-def handle_client(conn, addr):
-    msg_length = int(conn.recv(HEADER).decode(FORMAT))
-    msg = conn.recv(msg_length).decode(FORMAT)
-    print(msg)
-    while msg != FIN:
+
+def start():
+    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server.bind(ADDR)
+    server.listen()
+    while True:
+        conn, addr = server.accept()
         msg_length = int(conn.recv(HEADER).decode(FORMAT))
         msg = conn.recv(msg_length).decode(FORMAT)
         print(msg)
-    print("Sale del while")
-    conn.close()
-    exit(1)
+        while msg != FIN:
+            msg_length = int(conn.recv(HEADER).decode(FORMAT))
+            msg = conn.recv(msg_length).decode(FORMAT)
+            print(msg)
+        print("Sale del while")
+        conn.close()
+        exit(1)
+        
+def handle_server():
+    client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    client.connect(ADDR_CLIENT)
+    msg = sys.argv[3]
+    message = msg.encode(FORMAT)
+    msg_length = len(message)
+    send_length = str(msg_length).encode(FORMAT)
+    send_length += b' ' * (HEADER - len(send_length))
+    client.send(send_length)
+    client.send(message)
+    respuesta = client.recv(4096)
+    print(respuesta.decode('utf-8'))
 
-def start():
-    server.listen()
-    CONEX_ACTIVAS = threading.active_count()-1
-    print(CONEX_ACTIVAS)
-    while True:
-        conn, addr = server.accept()
-        CONEX_ACTIVAS = threading.active_count()
-        if (CONEX_ACTIVAS <= MAX_CONEXIONES): 
-            thread = threading.Thread(target=handle_client, args=(conn, addr))
-            thread.start()
-            print(f"[CONEXIONES ACTIVAS] {CONEX_ACTIVAS}")
-            print("CONEXIONES RESTANTES PARA CERRAR EL SERVICIO", MAX_CONEXIONES-CONEX_ACTIVAS)
-        else:
-            print("OOppsss... DEMASIADAS CONEXIONES. ESPERANDO A QUE ALGUIEN SE VAYA")
-            conn.send("OOppsss... DEMASIADAS CONEXIONES. Tendrás que esperar a que alguien se vaya".encode(FORMAT))
-            conn.close()
-            CONEX_ACTUALES = threading.active_count()-1
+#Función cliente con la central
+SERVER_CLIENT = sys.argv[1]
+PORT_CLIENT = int(sys.argv[2])
+ADDR_CLIENT = (SERVER_CLIENT,PORT_CLIENT)
 
-server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-server.bind(ADDR)
+t1= threading.Thread(target=handle_server)
+t1.start()
 
-start()
+
+
+
+#Función servidor con el sensor
+t2= threading.Thread(target=start)
+t2.start()
+
 
 #if (len(sys.argv)==6):
-#    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-#    ADDR=(SERVER,PORT)
-#    server.bind(ADDR)
-#    start()
+#    
 #else:
 #    print("Los argumentos son:<Ip del EC_Central><Puerto del EC_Central><Ip del broker><Puerto del broker>><ID del taxi>")
