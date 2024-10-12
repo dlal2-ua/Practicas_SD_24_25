@@ -1,6 +1,8 @@
 import time
 from confluent_kafka import Producer  
 import sqlite3
+import sys # Se utiliza para acceder a parámetros y funciones específicas del sistema (en este caso, para acceder a los argumentos de la línea de comandos)
+
 
 """
 Pasos a implementar:
@@ -23,54 +25,102 @@ Pasos a implementar:
 
 """
 
-# Configuración del productor
-conf = {
-    'bootstrap.servers': '127.0.0.1:9092'  # Dirección del servidor Kafka, en este caso localhost
-}
 
-# --- Función principal ---
-def main(broker, cliente_id, archivo_servicios):
-    # Leer los servicios a solicitar
-    servicios = leer_servicios(archivo_servicios)
+# Función para obtener el total de servicios y el primer destino del cliente
+def obtener_info_cliente(cliente_id):
+    try:
+        # Conectarse a la base de datos
+        conn = sqlite3.connect('database.db')
+        cursor = conn.cursor()
+
+        # Consulta SQL para obtener el total de servicios y el primer destino
+        query_total = '''
+        SELECT COUNT(*)
+        FROM servicios
+        WHERE id = ?;
+        '''
+
+        query_destino = '''
+        SELECT destino
+        FROM servicios
+        WHERE id = ?
+        LIMIT 1;
+        '''
+
+        # Ejecutar la consulta para contar los servicios
+        cursor.execute(query_total, (cliente_id,))
+        total_servicios = cursor.fetchone()[0]
+
+        # Ejecutar la consulta para obtener el primer destino
+        cursor.execute(query_destino, (cliente_id,))
+        primer_destino = cursor.fetchone()[0] if total_servicios > 0 else None
+
+        # Cerrar la conexión a la base de datos
+        conn.close()
+
+        return total_servicios, primer_destino
+
+    except sqlite3.Error as e:
+        print(f"Error al acceder a la base de datos: {e}")
+        return None, None
+
+
+
+# Función para enviar el destino al tópico de Kafka
+def enviar_a_kafka(producer, cliente_id, destino):
+    mensaje = f"Cliente {cliente_id} quiere ir a {destino}"             
+    print(f"Enviando mensaje: {mensaje}")
+    producer.produce('CLIENTES', key=cliente_id, value=mensaje)
+    producer.flush()
+
+
+
+# Función principal que conecta todo
+def main(broker, cliente_id):
+    # Obtener el total de servicios y el primer destino del cliente
+    total_servicios_cliente, primer_destino = obtener_info_cliente(cliente_id)
+
+    if total_servicios_cliente == 0 or primer_destino is None:
+        print(f"El cliente {cliente_id} no tiene destinos.")
+        return
+
+    # Mostrar el total de servicios y el primer destino
+    print(f"El cliente {cliente_id} tiene {total_servicios_cliente} servicios.")
+    print(f"El primer destino del cliente es: {primer_destino}")
 
     # Configurar el productor Kafka
     producer_config = {
-        'bootstrap.servers': broker,
+        'bootstrap.servers': broker
     }
     producer = Producer(producer_config)
 
-    # Configurar el consumidor Kafka (para escuchar confirmaciones)
-    consumer_config = {
-        'bootstrap.servers': broker,
-        'group.id': f'EC_Confirmation_{cliente_id}',
-        'auto.offset.reset': 'earliest',
-    }
-    consumer = Consumer(consumer_config)
-    consumer.subscribe([f'EC_Confirmation_{cliente_id}'])
+    # Enviar el primer destino al tópico de Kafka
+    enviar_a_kafka(producer, cliente_id, primer_destino)
 
-    # Solicitar taxis por cada servicio del archivo
-    for destino in servicios:
-        solicitar_taxi(producer, cliente_id, destino)
+    # Finalizar
+    print(f"El destino '{primer_destino}' ha sido enviado al tópico de Kafka.")
 
-        # Escuchar confirmación de que el servicio ha concluido
-        if escuchar_confirmacion(consumer):
-            print(f"Servicio hacia {destino} concluido.")
-        
-        # Esperar 4 segundos antes de solicitar el próximo servicio
-        time.sleep(4)
 
-    # Cerrar conexiones
-    producer.flush()
-    consumer.close()
-    print("Todos los servicios solicitados han sido procesados.")
-
-if __name__ == "__main__":
-    if len(sys.argv) != 4:
-        print(f"Uso: python {sys.argv[0]} <broker> <id_cliente> <archivo_servicios>")
+def validar_cliente_id(cliente_id):
+    if len(cliente_id) != 1 or not cliente_id.islower():
+        print("Error: La ID del cliente debe ser un único carácter en minúscula.")
         sys.exit(1)
 
+
+
+if __name__ == "__main__":
+    if len(sys.argv) != 3:
+        print(f"Uso: python {sys.argv[0]} <broker_ip:puerto> <id_cliente>")  # Ejemplo: 127.0.0.1:9092
+        sys.exit(1)
+
+    # Obtener parámetros de línea de comando
     broker = sys.argv[1]
     cliente_id = sys.argv[2]
-    archivo_servicios = sys.argv[3]
 
-    main(broker, cliente_id, archivo_servicios)
+    # Validar que la ID del cliente sea un único carácter en minúscula
+    validar_cliente_id(cliente_id)
+
+    # Ejecutar el programa principal
+    main(broker, cliente_id)
+    time.sleep(4)  # Esperar 4 segundos antes de solicitar el siguiente servicio
+

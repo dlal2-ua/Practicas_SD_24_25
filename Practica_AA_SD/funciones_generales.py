@@ -59,7 +59,7 @@ def leer_existencia_taxi(id):
 
 
 # Función para insertar datos en la base de datos
-def insert_datos_taxi(id, destino, estado, coordX, coordY):
+def insert_datos_taxi(id, destinoIn, destinoFin, estado, coordX, coordY):
     # Conectar a la base de datos
     conexion = sqlite3.connect('../database.db')
     
@@ -69,8 +69,8 @@ def insert_datos_taxi(id, destino, estado, coordX, coordY):
     # Insertar los datos en la tabla 'taxis'
     try:
         cursor.execute('''
-        INSERT INTO taxis (id, destino, estado, coordX, coordY) VALUES (?, ?, ?, ?, ?)
-        ''', (id, destino, estado, coordX, coordY))
+        INSERT INTO taxis (id, destino_a_cliente, destino_a_final, estado, coordX, coordY) VALUES (?, ?, ?, ?, ?, ?)
+        ''', (id, destinoIn, destinoFin, estado, coordX, coordY))
         
         # Confirmar los cambios
         conexion.commit()

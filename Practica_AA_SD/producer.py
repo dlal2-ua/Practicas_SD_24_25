@@ -40,6 +40,7 @@ print('***THE END***')  # Mensaje final para indicar que el proceso ha terminado
 #====================================================================
 
 """
+
 import time
 from confluent_kafka import Producer  # Importa la librería Confluent Kafka para el productor
 
