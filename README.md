@@ -1,20 +1,22 @@
 MEMORIA
 
 Proceso de realización:
--Crear la central
-·
-·
-
--Crear los taxis
-·
-·
--Crear los clientes
-
--Crear la base de datos
-
--Crear la relación entre central, taxis y clientes (usando kafka)
-
--Crear tabla de información y el mapa
+  -Crear la central
+    · Parte del codigo que gestione la conectividad central-taxi y central-cliente (kafka)
+    · Que imprima el mapa y tabla de información
+    · Autentificar los taxis (sockets)
+  
+  -Crear los taxis
+    · Posición inicial de todos en la casilla [1,1]
+    ·
+  -Crear los clientes
+   · Todos lo clientes pueden leer todos los mensajes de kafka
+  
+  -Crear la base de datos
+    
+  -Crear tabla de información y el mapa
+    · Poner los colores correspodiente y de forma dinamica
+    · Que al entrar o salir un taxi se vea reflejado en la tabla
 
 En relacion con la base de datos [BBDD]:
 -Hemos decidido hacer una base de datos usando SQLite dado que en comparación con el fichero, el manejo de datos con sql es mucho más sencillo y fácil de obtener la información
