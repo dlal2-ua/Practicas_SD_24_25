@@ -3,7 +3,7 @@ import sqlite3
 # Función para insertar datos en la base de datos
 def update_datos_taxi(id, destino, estado, coordX, coordY):
     # Conectar a la base de datos
-    conexion = sqlite3.connect('database.db')
+    conexion = sqlite3.connect('../database.db')
     
     # Crear un cursor
     cursor = conexion.cursor()
@@ -27,7 +27,7 @@ def update_datos_taxi(id, destino, estado, coordX, coordY):
 def leer_existencia_taxi(id):
     try:
         # Conectar a la base de datos
-        conexion = sqlite3.connect('database.db')
+        conexion = sqlite3.connect('../database.db')
         
         # Crear un cursor
         cursor = conexion.cursor()
@@ -61,7 +61,7 @@ def leer_existencia_taxi(id):
 # Función para insertar datos en la base de datos
 def insert_datos_taxi(id, destino, estado, coordX, coordY):
     # Conectar a la base de datos
-    conexion = sqlite3.connect('database.db')
+    conexion = sqlite3.connect('../database.db')
     
     # Crear un cursor
     cursor = conexion.cursor()
