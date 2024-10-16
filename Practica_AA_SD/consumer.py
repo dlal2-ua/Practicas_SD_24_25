@@ -4,7 +4,7 @@ from funciones_generales import update_datos_taxi, leer_existencia_taxi, insert_
 
 
 # =================================================================================================
-
+"""
 
 # Configuración del consumidor Kafka
 conf = {
@@ -133,4 +133,3 @@ finally:
     consumer.close()
     print("Consumidor cerrado.")
 
-"""

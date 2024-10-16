@@ -1,7 +1,8 @@
 import time
-from confluent_kafka import Producer  
-import sqlite3
+import threading
+from confluent_kafka import Producer, Consumer, KafkaException
 import sys # Se utiliza para acceder a parámetros y funciones específicas del sistema (en este caso, para acceder a los argumentos de la línea de comandos)
+import signal
 
 
 """
@@ -25,68 +26,111 @@ Pasos a implementar:
 
 """
 
+"""
+Grupo de consumidores:
 
-# Función para obtener el total de servicios y el primer destino del cliente
-def obtener_info_cliente(cliente_id):
+ -   El grupo de consumidores ya no se pasa como argumento. En su lugar, se genera un nombre de grupo único en función de la ID del cliente: group.id = f'grupo_consumidor_{cliente_id}'. Esto asegura que cada cliente tiene su propio grupo de consumidores.
+
+ -   Alternativamente, si quieres que varios clientes compartan un grupo, podrías establecer un grupo por un conjunto de clientes, pero en este ejemplo, se ha hecho único por cada cliente.
+
+Filtro de mensajes:
+
+    -Se mantiene el filtrado de mensajes en el consumidor, donde se compara la clave (key) del mensaje recibido con la ID del cliente. Solo se procesa el mensaje si las claves coinciden, ignorando los demás mensajes.
+Uso del grupo:
+
+Dado que cada cliente tiene su propio grupo de consumidores basado en su ID, no es necesario especificar manualmente un grupo.
+"""
+
+"""
+Flujo de ejecución:
+    El productor envía un mensaje con el destino del cliente al tópico CLIENTES, usando la ID del cliente como clave (key).
+    El consumidor escucha el tópico CENTRAL y procesa solo los mensajes cuya clave coincida con la ID del cliente, asegurándose de que cada cliente reciba solo los mensajes que le corresponden
+"""
+
+"""
+Semáforo para sincronización:
+
+    Se ha añadido un semáforo (threading.Semaphore) para sincronizar el envío de los destinos. El productor espera hasta que el consumidor libere el semáforo, lo que ocurre cuando se recibe un mensaje OK desde la central.
+    Productor:
+
+    El productor envía un destino y luego espera a que el semáforo se libere (tras recibir la confirmación de la central). Una vez recibido el OK, procede al siguiente destino. Esto se repite hasta que se hayan enviado todos los destinos.
+    Consumidor:
+
+    El consumidor escucha el tópico CENTRAL-CLIENTE y verifica si el mensaje recibido es del formato ID:<cliente_id> OK. Cuando el mensaje corresponde al cliente y es válido, libera el semáforo, permitiendo al productor enviar el siguiente destino.
+
+"""
+
+
+# Variable global para controlar la ejecución de los hilos
+salir_programa = False
+semaforo_terminacion = threading.Event()  # Señal para indicar cuando todos los destinos han sido procesados
+
+# Manejador de la señal SIGINT para detener el programa con Ctrl+C
+def manejar_ctrl_c(signal, frame):
+    global salir_programa
+    print("\nCtrl+C detectado, cerrando el programa...")
+    salir_programa = True
+    semaforo_terminacion.set()  # Asegurarse de que el programa se cierre
+
+
+# Función para obtener todos los destinos del cliente desde un fichero
+def obtener_info_cliente(cliente_id, fichero):
+    destinos = []
+
     try:
-        # Conectarse a la base de datos
-        conn = sqlite3.connect('database.db')
-        cursor = conn.cursor()
+        # Abrir el fichero y leer línea por línea
+        with open(fichero, 'r') as f:
+            lineas = f.readlines()
 
-        # Consulta SQL para obtener el total de servicios y el primer destino
-        query_total = '''
-        SELECT COUNT(*)
-        FROM servicios
-        WHERE id = ?;
-        '''
+        # Procesar el archivo, buscando el cliente y sus destinos
+        cliente_encontrado = False
+        for linea in lineas:
+            linea = linea.strip()  # Eliminar espacios y saltos de línea
 
-        query_destino = '''
-        SELECT destino
-        FROM servicios
-        WHERE id = ?
-        LIMIT 1;
-        '''
+            if not cliente_encontrado:
+                # Buscar el cliente (en minúsculas)
+                if linea == cliente_id:
+                    cliente_encontrado = True
+            else:
+                # Buscar destinos en mayúsculas para el cliente
+                if linea.isupper():
+                    destinos.append(linea)
+                elif linea.islower():
+                    # Si encontramos otra letra en minúsculas, significa que es otro cliente, terminamos
+                    break
 
-        # Ejecutar la consulta para contar los servicios
-        cursor.execute(query_total, (cliente_id,))
-        total_servicios = cursor.fetchone()[0]
+        # Si no se encontraron destinos para el cliente, devolver lista vacía
+        if not destinos:
+            return []
 
-        # Ejecutar la consulta para obtener el primer destino
-        cursor.execute(query_destino, (cliente_id,))
-        primer_destino = cursor.fetchone()[0] if total_servicios > 0 else None
+        return destinos
 
-        # Cerrar la conexión a la base de datos
-        conn.close()
-
-        return total_servicios, primer_destino
-
-    except sqlite3.Error as e:
-        print(f"Error al acceder a la base de datos: {e}")
-        return None, None
-
+    except FileNotFoundError:
+        print(f"Error: El fichero '{fichero}' no existe.")
+        return []
+    except Exception as e:
+        print(f"Error al procesar el fichero: {e}")
+        return []
 
 
-# Función para enviar el destino al tópico de Kafka
+# Función para enviar el destino al tópico de Kafka (Producer)
 def enviar_a_kafka(producer, cliente_id, destino):
-    mensaje = f"Cliente {cliente_id} quiere ir a {destino}"             
-    print(f"Enviando mensaje: {mensaje}")
+    mensaje = f"Cliente '{cliente_id}' quiere ir a {destino}"             
+    print(mensaje)
     producer.produce('CLIENTES', key=cliente_id, value=mensaje)
     producer.flush()
 
 
+# Hilo Productor que envía destinos uno a uno al tópico 'CLIENTES'
+def hilo_productor_kafka(broker, cliente_id, destinos_cliente, semaforo):
+    global salir_programa
 
-# Función principal que conecta todo
-def main(broker, cliente_id):
-    # Obtener el total de servicios y el primer destino del cliente
-    total_servicios_cliente, primer_destino = obtener_info_cliente(cliente_id)
-
-    if total_servicios_cliente == 0 or primer_destino is None:
-        print(f"El cliente {cliente_id} no tiene destinos.")
+    # Si no hay destinos, terminar el hilo productor
+    if not destinos_cliente:
+        print(f"El cliente {cliente_id} no tiene destinos y/o no existe.")
         return
 
-    # Mostrar el total de servicios y el primer destino
-    print(f"El cliente {cliente_id} tiene {total_servicios_cliente} servicios.")
-    print(f"El primer destino del cliente es: {primer_destino}")
+    print(f"El cliente {cliente_id} tiene {len(destinos_cliente)} destinos.")
 
     # Configurar el productor Kafka
     producer_config = {
@@ -94,33 +138,121 @@ def main(broker, cliente_id):
     }
     producer = Producer(producer_config)
 
-    # Enviar el primer destino al tópico de Kafka
-    enviar_a_kafka(producer, cliente_id, primer_destino)
+    # Enviar destinos uno por uno, esperando confirmación de OK antes de enviar el siguiente
+    for i, destino in enumerate(destinos_cliente):
+        if salir_programa:
+            break
 
-    # Finalizar
-    print(f"El destino '{primer_destino}' ha sido enviado al tópico de Kafka.")
+        enviar_a_kafka(producer, cliente_id, destino)
+
+        # Para destinos intermedios, mantener el mensaje habitual
+        print(f"Esperando confirmación de la central para el destino '{destino}'...")
+        semaforo.acquire()  # Bloquear hasta recibir la confirmación del destino actual
+
+        if i == len(destinos_cliente) - 1:
+            print("Todos los destinos han sido procesados. No se esperan más mensajes.")
+            semaforo_terminacion.set()
+        
+        print()  # Salto de línea para mejorar la legibilidad en la salida
 
 
+# Hilo Consumidor que escucha el tópico 'CENTRAL-CLIENTE' y procesa mensajes en formato "ID:<cliente_id> OK"
+def hilo_consumidor_kafka(broker, cliente_id, semaforo):
+    global salir_programa
+
+    # Configuración del consumidor Kafka
+    consumer_config = {
+        'bootstrap.servers': broker,
+        'group.id': f'grupo_consumidor_{cliente_id}',  # Grupo de consumidores basado en la ID del cliente
+        'auto.offset.reset': 'earliest'  # Empezar desde el principio si no hay offset
+    }
+
+    # Suscribirse al tópico específico para el cliente
+    consumer = Consumer(consumer_config)
+    topic_cliente = f'CENTRAL-CLIENTE'
+    consumer.subscribe([topic_cliente])
+
+
+    try:
+        while not salir_programa:
+            msg = consumer.poll(timeout=0.2)  # Esperar por mensajes durante 0.2 segundos
+            if msg is None:
+                continue
+            if msg.error():
+                raise KafkaException(msg.error())
+            else:
+                # Procesar el mensaje en formato "ID:<cliente_id> OK"
+                mensaje = msg.value().decode('utf-8')
+
+                # Verificar si el mensaje sigue el formato esperado: "ID:<cliente_id> OK"
+                if mensaje.startswith(f"ID:{cliente_id} OK"):
+                    if not semaforo_terminacion.is_set():
+                        # No es el último destino, continuar con el flujo normal
+                        print(f"Cliente '{cliente_id}' recibió OK")
+                        print()  # Salto de línea para mejorar la legibilidad en la salida
+                        time.sleep(4)  # Esperar 4 segundos antes de enviar el siguiente destino
+                        semaforo.release()  # Liberar el semáforo para que el productor envíe el siguiente destino
+                    else:
+                        break  # Terminar la espera, ya que es el último destino
+                    
+    except KafkaException as e:
+        print(f"Error en el consumidor: {e}")
+    except KeyboardInterrupt:
+        print("Interrumpido por el usuario.")
+    finally:
+        # Cerrar el consumidor
+        consumer.close()
+
+
+# Validar que la ID del cliente sea un único carácter en minúscula
 def validar_cliente_id(cliente_id):
     if len(cliente_id) != 1 or not cliente_id.islower():
         print("Error: La ID del cliente debe ser un único carácter en minúscula.")
         sys.exit(1)
 
 
-
+# Función principal
 if __name__ == "__main__":
-    if len(sys.argv) != 3:
-        print(f"Uso: python {sys.argv[0]} <broker_ip:puerto> <id_cliente>")  # Ejemplo: 127.0.0.1:9092
+    # Configurar el manejador de la señal Ctrl+C
+    signal.signal(signal.SIGINT, manejar_ctrl_c)
+
+    if len(sys.argv) != 4:
+        print(f"Uso: python {sys.argv[0]} <broker_ip:puerto> <id_cliente> <fichero>")
         sys.exit(1)
 
     # Obtener parámetros de línea de comando
     broker = sys.argv[1]
     cliente_id = sys.argv[2]
+    fichero = sys.argv[3]
 
-    # Validar que la ID del cliente sea un único carácter en minúscula
+    # Validar la ID del cliente
     validar_cliente_id(cliente_id)
 
-    # Ejecutar el programa principal
-    main(broker, cliente_id)
-    time.sleep(4)  # Esperar 4 segundos antes de solicitar el siguiente servicio
+    # Obtener todos los destinos del cliente
+    destinos_cliente = obtener_info_cliente(cliente_id, fichero)
 
+    # Crear un semáforo para coordinar la comunicación entre productor y consumidor
+    semaforo = threading.Semaphore(0)
+
+    # Crear los hilos para el productor y consumidor
+    hilo_productor = threading.Thread(target=hilo_productor_kafka, args=(broker, cliente_id, destinos_cliente, semaforo))
+    hilo_consumidor = threading.Thread(target=hilo_consumidor_kafka, args=(broker, cliente_id, semaforo))
+
+    # Iniciar los hilos
+    hilo_productor.start()
+    hilo_consumidor.start()
+
+    # Esperar a que se completen todos los destinos
+    semaforo_terminacion.wait()  # Esperar hasta que todos los destinos hayan sido enviados y confirmados
+
+    # Establecer la bandera de salir para que los hilos terminen
+    salir_programa = True
+
+    # Asegurarse de que el semáforo se libere para que los hilos no se queden bloqueados
+    semaforo.release()
+
+    # Esperar a que ambos hilos terminen
+    hilo_productor.join()
+    hilo_consumidor.join()
+
+    print("Todos los destinos han sido procesados. Programa terminado.")

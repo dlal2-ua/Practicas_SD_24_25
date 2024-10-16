@@ -39,6 +39,22 @@ CREATE TABLE IF NOT EXISTS pos_inicial_cliente(
 )
 ''')
 
+
+               
+cursor.execute('''
+CREATE TABLE IF NOT EXISTS destinos(
+    destino CHAR PRIMARY KEY,
+    coordX INTEGER NOT NULL,
+    coordY INTEGER NOT NULL
+)
+''')
+
+
+
+
+#================================================================================================
+# INSERTS
+"""
 cursor.execute('''
     INSERT INTO pos_inicial_cliente (id, coordX, coordY) VALUES 
     ('a', 10, 10),
@@ -47,26 +63,20 @@ cursor.execute('''
     ('d', 40, 40),
     ('e', 50, 50)
 ''')
-               
-cursor.execute('''
-CREATE TABLE IF NOT EXISTS servicios(
-    id_servicio INTEGER PRIMARY KEY AUTOINCREMENT,  
-    id CHAR NOT NULL,                              
-    destino CHAR NOT NULL,
-    coordX INTEGER NOT NULL,
-    coordY INTEGER NOT NULL
-)
-''')
 
+"""
 
 cursor.execute('''
-INSERT INTO servicios (id, destino, coordX, coordY) VALUES
-('a', 'F', 10, 10),
-('b', 'G', 20, 20),
-('c', 'X', 30, 30),
-('a', 'Y', 40, 40)
+    INSERT INTO destinos (destino, coordX, coordY) VALUES
+    ('H', 15, 19),
+    ('N', 1, 20),
+    ('X', 6, 6),
+    ('U', 16, 11),
+    ('L', 9, 9),
+    ('T', 18, 3)
 ''')
 
+#================================================================================================
 
 # Confirmar la creación de la tabla
 conexion.commit()
@@ -75,12 +85,6 @@ conexion.commit()
 conexion.close()
 
 
-#================================================================================================
-
-
-
-
-#================================================================================================
 
 
 
