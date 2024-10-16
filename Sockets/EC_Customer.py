@@ -5,6 +5,7 @@ import sys # Se utiliza para acceder a parámetros y funciones específicas del 
 import signal
 
 
+
 # Variable global para controlar la ejecución de los hilos
 salir_programa = False
 semaforo_terminacion = threading.Event()  # Señal para indicar cuando todos los destinos han sido procesados
@@ -13,9 +14,8 @@ semaforo_terminacion = threading.Event()  # Señal para indicar cuando todos los
 def manejar_ctrl_c(signal, frame):
     global salir_programa
     print("\nCtrl+C detectado, cerrando el programa...")
-    salir_programa = True
-    semaforo_terminacion.set()  # Asegurarse de que el programa se cierre
-
+    salir_programa = True  # Establecer la bandera para salir
+    semaforo_terminacion.set()  # Notificar que se debe cerrar
 
 # Función para obtener todos los destinos del cliente desde un fichero
 def obtener_info_cliente(cliente_id, fichero):
@@ -43,11 +43,7 @@ def obtener_info_cliente(cliente_id, fichero):
                     # Si encontramos otra letra en minúsculas, significa que es otro cliente, terminamos
                     break
 
-        # Si no se encontraron destinos para el cliente, devolver lista vacía
-        if not destinos:
-            return []
-
-        return destinos
+        return destinos  # Devolver la lista de destinos
 
     except FileNotFoundError:
         print(f"Error: El fichero '{fichero}' no existe.")
@@ -56,14 +52,12 @@ def obtener_info_cliente(cliente_id, fichero):
         print(f"Error al procesar el fichero: {e}")
         return []
 
-
 # Función para enviar el destino al tópico de Kafka (Producer)
 def enviar_a_kafka(producer, cliente_id, destino):
     mensaje = f"Cliente '{cliente_id}' quiere ir a {destino}"             
     print(mensaje)
     producer.produce('CLIENTES', key=cliente_id, value=mensaje)
     producer.flush()
-
 
 # Hilo Productor que envía destinos uno a uno al tópico 'CLIENTES'
 def hilo_productor_kafka(broker, cliente_id, destinos_cliente, semaforo):
@@ -82,24 +76,42 @@ def hilo_productor_kafka(broker, cliente_id, destinos_cliente, semaforo):
     }
     producer = Producer(producer_config)
 
-    # Enviar destinos uno por uno, esperando confirmación de OK antes de enviar el siguiente
+    # Enviar destinos uno por uno, esperando confirmación de IN y OK
     for i, destino in enumerate(destinos_cliente):
         if salir_programa:
-            break
+            break  # Salir del bucle si se ha recibido la señal de salida
 
-        enviar_a_kafka(producer, cliente_id, destino)
+        # 1. El cliente pide ir al destino
+        mensaje_ir_destino = f"Cliente '{cliente_id}' quiere ir a {destino}"
+        print(mensaje_ir_destino)
+        producer.produce('CLIENTES', key=cliente_id, value=mensaje_ir_destino)
+        producer.flush()
 
-        # Para destinos intermedios, mantener el mensaje habitual
-        print(f"Esperando confirmación de la central para el destino '{destino}'...")
-        semaforo.acquire()  # Bloquear hasta recibir la confirmación del destino actual
+        # 2. Esperar la confirmación de recogida (IN)
+        print(f"Esperando confirmación de recogida para el destino '{destino}'...")
+        semaforo.acquire()  # Bloquear hasta recibir la confirmación de IN
+
+        # 3. Después de la confirmación de recogida, mostrar el mensaje de recogida
+        print(f"CLIENTE RECOGIDO, YENDO A '{destino}'")
+
+        # 4. Enviar mensaje de llegada (OK)
+        mensaje_llegada = f"Cliente '{cliente_id}' ha llegado a {destino}"
+        producer.produce('CLIENTES', key=cliente_id, value=mensaje_llegada)
+        producer.flush()
+
+        # 5. Esperar la confirmación de llegada (OK)
+        print(f"Esperando confirmación de llegada para el destino '{destino}'...")
+        semaforo.acquire()  # Bloquear hasta recibir la confirmación de OK
+
+        # 6. Confirmar que el cliente llegó al destino
+        print(f"CLIENTE EN EL DESTINO '{destino}'")
 
         if i == len(destinos_cliente) - 1:
-            semaforo_terminacion.set()
-        
+            semaforo_terminacion.set()  # Señalar que se ha completado el último destino
+
         print()  # Salto de línea para mejorar la legibilidad en la salida
 
-
-# Hilo Consumidor que escucha el tópico 'CENTRAL-CLIENTE' y procesa mensajes en formato "ID:<cliente_id> OK"
+# Hilo Consumidor que escucha el tópico 'CENTRAL-CLIENTE' y procesa mensajes en formato "ID:<cliente_id> IN" y "ID:<cliente_id> OK"
 def hilo_consumidor_kafka(broker, cliente_id, semaforo):
     global salir_programa
 
@@ -112,47 +124,42 @@ def hilo_consumidor_kafka(broker, cliente_id, semaforo):
 
     # Suscribirse al tópico específico para el cliente
     consumer = Consumer(consumer_config)
-    topic_cliente = f'CENTRAL-CLIENTE'
+    topic_cliente = 'CENTRAL-CLIENTE'
     consumer.subscribe([topic_cliente])
-
 
     try:
         while not salir_programa:
-            msg = consumer.poll(timeout=0.2)  # Esperar por mensajes durante 0.2 segundos
+            msg = consumer.poll(timeout=0.02)  # Esperar por mensajes durante 0.02 segundos
             if msg is None:
-                continue
-            if msg.error():
-                raise KafkaException(msg.error())
-            else:
-                # Procesar el mensaje en formato "ID:<cliente_id> OK"
-                mensaje = msg.value().decode('utf-8')
+                continue  # Si no hay mensajes, continuar
 
-                # Verificar si el mensaje sigue el formato esperado: "ID:<cliente_id> OK"
-                if mensaje.startswith(f"ID:{cliente_id} OK"):
-                    if not semaforo_terminacion.is_set():
-                        # No es el último destino, continuar con el flujo normal
-                        print(f"Cliente '{cliente_id}' recibió OK")
-                        print()  # Salto de línea para mejorar la legibilidad en la salida
-                        time.sleep(4)  # Esperar 4 segundos antes de enviar el siguiente destino
-                        semaforo.release()  # Liberar el semáforo para que el productor envíe el siguiente destino
-                    else:
-                        break  # Terminar la espera, ya que es el último destino
+            if msg.error():
+                raise KafkaException(msg.error())  # Manejo de errores del consumidor
+
+            # Procesar el mensaje recibido
+            mensaje = msg.value().decode('utf-8')
+
+            # Verificar si es un mensaje de recogida (IN)
+            if mensaje.startswith(f"ID:{cliente_id} IN"):
+                semaforo.release()  # Liberar el semáforo para que el productor envíe el siguiente destino
+
+            # Verificar si es un mensaje de llegada (OK)
+            elif mensaje.startswith(f"ID:{cliente_id} OK"):
+                semaforo.release()  # Liberar el semáforo para que el productor continúe o termine
+                if semaforo_terminacion.is_set():
+                    break  # Terminar la espera, ya que es el último destino
                     
     except KafkaException as e:
         print(f"Error en el consumidor: {e}")
-    except KeyboardInterrupt:
-        print("Interrumpido por el usuario.")
     finally:
         # Cerrar el consumidor
         consumer.close()
-
 
 # Validar que la ID del cliente sea un único carácter en minúscula
 def validar_cliente_id(cliente_id):
     if len(cliente_id) != 1 or not cliente_id.islower():
         print("Error: La ID del cliente debe ser un único carácter en minúscula.")
         sys.exit(1)
-
 
 # Función principal
 if __name__ == "__main__":
@@ -185,11 +192,13 @@ if __name__ == "__main__":
     hilo_productor.start()
     hilo_consumidor.start()
 
-    # Esperar a que se completen todos los destinos
-    semaforo_terminacion.wait()  # Esperar hasta que todos los destinos hayan sido enviados y confirmados
-
-    # Establecer la bandera de salir para que los hilos terminen
-    salir_programa = True
+    # Esperar a que se completen todos los destinos o se presione Ctrl+C
+    try:
+        semaforo_terminacion.wait()  # Esperar hasta que todos los destinos hayan sido enviados y confirmados
+    except KeyboardInterrupt:
+        print("Interrupción detectada, cerrando el programa...")
+        salir_programa = True  # Establecer la bandera para salir
+        semaforo_terminacion.set()  # Notificar que se debe cerrar
 
     # Asegurarse de que el semáforo se libere para que los hilos no se queden bloqueados
     semaforo.release()

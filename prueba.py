@@ -10,7 +10,7 @@ def conectar_bd():
 
 # Obtener los datos de la tabla taxis desde la base de datos
 def obtener_taxis(conexion):
-    query = "SELECT id, destino, estado FROM taxis"
+    query = "SELECT id, destino_a_cliente, estado FROM taxis"
     df_taxis = pd.read_sql_query(query, conexion)
     return df_taxis
 
