@@ -68,13 +68,14 @@ def enviar_destinos_kafka(broker, cliente_id, destinos_cliente):
     topic_cliente = 'CENTRAL-CLIENTE'
     consumer.subscribe([topic_cliente])
 
-    for destino in destinos_cliente:
+    for i, destino in enumerate(destinos_cliente):
         if salir_programa:
             break
 
         # Enviar el destino
         mensaje_ir_destino = f"Cliente '{cliente_id}' quiere ir a {destino}"
         print(mensaje_ir_destino)
+        print(f"Esperando confirmación de recogida...")
         producer.produce('CLIENTES', key=cliente_id, value=mensaje_ir_destino)
         producer.flush()
 
@@ -90,6 +91,7 @@ def enviar_destinos_kafka(broker, cliente_id, destinos_cliente):
             mensaje = msg.value().decode('utf-8')
             if mensaje == f"ID:{cliente_id} IN":
                 print(f"Confirmación recibida: Cliente recogido, yendo a {destino}")
+                print("Esperando confirmación de llegada...")
                 break
 
         # Enviar mensaje de llegada
@@ -111,6 +113,12 @@ def enviar_destinos_kafka(broker, cliente_id, destinos_cliente):
                 print(f"Confirmación recibida: Cliente llegó a {destino}")
                 print()
                 break
+        
+        # Si no es el último destino, esperar 4 segundos antes de procesar el siguiente destino
+        if i < len(destinos_cliente) - 1:
+            print("Esperando 4 segundos antes de ir al siguiente destino...")
+            print()
+            time.sleep(4)
 
     consumer.close()
 
