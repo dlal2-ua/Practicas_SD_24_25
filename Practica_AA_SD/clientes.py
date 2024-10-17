@@ -168,9 +168,9 @@ def enviar_destinos_kafka(broker, cliente_id, destinos_cliente):
             continue
 
         # Enviar mensaje de llegada
-        mensaje_llegada = f"Cliente '{cliente_id}' ha llegado a {destino}"
-        producer.produce('CLIENTES', key=cliente_id, value=mensaje_llegada)
-        producer.flush()
+        #mensaje_llegada = f"Cliente '{cliente_id}' ha llegado a {destino}"
+        #producer.produce('CLIENTES', key=cliente_id, value=mensaje_llegada)
+        #producer.flush()
 
         # Esperar la confirmación de llegada (OK)
         while not salir_programa:
