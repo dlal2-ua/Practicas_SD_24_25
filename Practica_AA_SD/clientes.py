@@ -3,6 +3,8 @@ import threading
 from confluent_kafka import Producer, Consumer, KafkaException
 import sys # Se utiliza para acceder a parámetros y funciones específicas del sistema (en este caso, para acceder a los argumentos de la línea de comandos)
 import signal
+from colorama import Fore, Style, init
+
 
 
 """
@@ -68,6 +70,9 @@ Cómo funciona:
     Espera la confirmación de que la central recibió el mensaje de llegada.
     Se repite este ciclo para cada destino hasta que todos hayan sido procesados.
 """
+
+# Inicializar colorama (solo es necesario en Windows)
+init(autoreset=True)
 
 # Variable global para controlar la ejecución del programa
 salir_programa = False
@@ -143,10 +148,24 @@ def enviar_destinos_kafka(broker, cliente_id, destinos_cliente):
                 raise KafkaException(msg.error())
 
             mensaje = msg.value().decode('utf-8')
+            
+            # Manejar error si se recibe "KO"
+            if mensaje == f"ID:{cliente_id} KO":
+                print()
+                print(Fore.RED + f"Error: Fracaso en la recogida del cliente '{cliente_id}' para el destino {destino}.")
+                print(Fore.GREEN + f"Saliendo de este destino y continuando con el siguiente...")
+                print()
+                break
+
             if mensaje == f"ID:{cliente_id} IN":
-                print(f"Confirmación recibida: Cliente recogido, yendo a {destino}")
+                print()
+                print(Fore.GREEN + f"Confirmación recibida: Cliente recogido, yendo a {destino}")
                 print("Esperando confirmación de llegada...")
                 break
+
+        # Si se ha recibido un "KO", pasar al siguiente destino
+        if mensaje == f"ID:{cliente_id} KO":
+            continue
 
         # Enviar mensaje de llegada
         mensaje_llegada = f"Cliente '{cliente_id}' ha llegado a {destino}"
@@ -163,18 +182,33 @@ def enviar_destinos_kafka(broker, cliente_id, destinos_cliente):
                 raise KafkaException(msg.error())
 
             mensaje = msg.value().decode('utf-8')
-            if mensaje == f"ID:{cliente_id} OK":
-                print(f"Confirmación recibida: Cliente llegó a {destino}")
+            
+            # Manejar error si se recibe "KO", tanto por si no hay taxis disponibles como si no se ha podido llegar al destino
+            if mensaje == f"ID:{cliente_id} KO":
+                print()
+                print(Fore.RED + f"Error: Fracaso en la llegada del cliente '{cliente_id}' a {destino}.")
+                print(Fore.GREEN + f"Saliendo de este destino y continuando con el siguiente...")
                 print()
                 break
-        
+
+            if mensaje == f"ID:{cliente_id} OK":
+                print()
+                print(Fore.GREEN + f"Confirmación recibida: Cliente llegó a {destino}")
+                print()
+                break
+
+        # Si se ha recibido un "KO", pasar al siguiente destino
+        if mensaje == f"ID:{cliente_id} KO":
+            continue
+
         # Si no es el último destino, esperar 4 segundos antes de procesar el siguiente destino
-        if i < len(destinos_cliente) - 1:
+        if i < len(destinos_cliente) - 1 and not salir_programa:
             print("Esperando 4 segundos antes de ir al siguiente destino...")
             print()
             time.sleep(4)
 
     consumer.close()
+
 
 # Validar que la ID del cliente sea un único carácter en minúscula
 def validar_cliente_id(cliente_id):
@@ -200,5 +234,5 @@ if __name__ == "__main__":
     enviar_destinos_kafka(broker, cliente_id, destinos_cliente)
 
     if not salir_programa:
-        print("Todos los destinos han sido procesados. Programa terminado.")
+        print(Fore.YELLOW + "Todos los destinos han sido procesados...")
         print() 

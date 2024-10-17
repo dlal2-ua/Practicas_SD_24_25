@@ -22,6 +22,13 @@ def obtener_clientes(conexion):
     return df_clientes
 """
 
+def obtener_destinos(conexion):
+    query = "SELECT destino, coordX, coordY FROM destinos"
+    df_destinos = pd.read_sql_query(query, conexion)
+    return df_destinos
+
+
+
 # Función para limpiar la terminal
 def limpiar_pantalla():
     os.system('cls' if os.name == 'nt' else 'clear')
@@ -38,7 +45,7 @@ def imprimir_mapa(df_taxis): #, df_clientes
     print("| Id | Destino | Estado          |")
     print("+----+---------+-----------------+")
     for _, row in df_taxis.iterrows():
-        print(f"| {row['id']:2} | {row['destino']:7} | {row['estado']:15} |")
+        print(f"| {row['id']:2} | {row['destino_a_cliente']:7} | {row['estado']:15} |")
     print("+----+---------+-----------------+")
 
 """
@@ -52,9 +59,12 @@ def imprimir_mapa(df_taxis): #, df_clientes
     print("+----+---------+-----------------+")
 """
 
+"""
 # Monitorizar cambios en la base de datos
 def monitorizar_bd():
     conexion = conectar_bd()
+
+    
 
     # Inicialmente, cargar los datos de la base de datos
     df_taxis = obtener_taxis(conexion)
@@ -86,3 +96,17 @@ def monitorizar_bd():
 # Comenzar a monitorizar la base de datos
 monitorizar_bd()
 
+
+"""
+conexion = conectar_bd()
+destino = obtener_destinos(conexion)
+print(" Destinos:")
+print("+---------+--------+---------+")
+print("| Destino | CoordX | CoordY  |")
+print("+---------+--------+---------+")
+
+# Ajustar el ancho de las columnas para que queden bien alineadas
+for _, row in destino.iterrows():
+    print(f"| {row['destino']:<7} | {row['coordX']:<6} | {row['coordY']:<7} |")
+
+print("+---------+--------+---------+")
