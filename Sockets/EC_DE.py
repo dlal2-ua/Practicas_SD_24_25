@@ -24,11 +24,10 @@ def start():
             msg_length = int(conn.recv(HEADER).decode(FORMAT))
             msg = conn.recv(msg_length).decode(FORMAT)
             print(msg)
-        print("Sale del while")
         conn.close()
         exit(1)
         
-def handle_server():
+"""def handle_server():
     client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     client.connect(ADDR_CLIENT)
     msg = sys.argv[3]
@@ -39,22 +38,26 @@ def handle_server():
     client.send(send_length)
     client.send(message)
     respuesta = client.recv(4096)
-    print(respuesta.decode('utf-8'))
+    print(respuesta.decode('utf-8'))"""
 
 #Función cliente con la central
-SERVER_CLIENT = sys.argv[1]
+"""SERVER_CLIENT = sys.argv[1]
 PORT_CLIENT = int(sys.argv[2])
-ADDR_CLIENT = (SERVER_CLIENT,PORT_CLIENT)
-
-t1= threading.Thread(target=handle_server)
-t1.start()
-
-
+ADDR_CLIENT = (SERVER_CLIENT,PORT_CLIENT)"""
 
 
 #Función servidor con el sensor
-t2= threading.Thread(target=start)
+"""t2= threading.Thread(target=start)
 t2.start()
+
+t1= threading.Thread(target=handle_server)
+t1.start()"""
+start()
+
+
+
+
+
 
 
 #if (len(sys.argv)==6):

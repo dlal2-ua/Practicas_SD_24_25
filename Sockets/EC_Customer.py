@@ -4,8 +4,6 @@ from confluent_kafka import Producer, Consumer, KafkaException
 import sys # Se utiliza para acceder a parámetros y funciones específicas del sistema (en este caso, para acceder a los argumentos de la línea de comandos)
 import signal
 
-
-
 """
 Cómo funciona:
     El cliente envía un mensaje de solicitud para ir a un destino.
