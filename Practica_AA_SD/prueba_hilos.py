@@ -1,6 +1,12 @@
-from kafka import KafkaProducer, KafkaConsumer
-from threading import Thread
+from kafka import KafkaConsumer, KafkaProducer
+import threading
 import time
+import queue
+import pandas as pd
+import signal
+import sys
+import matplotlib.pyplot as plt
+import numpy as np
 
 """
 DEMO DE CENTRAL PARA PROBAR CLIENTES:
@@ -51,13 +57,7 @@ if __name__ == "__main__":
     producer_thread.join()
 
 """
-from kafka import KafkaConsumer, KafkaProducer
-import threading
-import time
-import queue
-import pandas as pd
-import signal
-import sys
+
 
 # Inicializar una tabla (DataFrame) con las columnas ID, DESTINO, ESTADO
 tabla = pd.DataFrame(columns=["ID", "DESTINO", "ESTADO"])
@@ -76,6 +76,17 @@ def manejar_cierre(signal, frame):
     global central_activa
     print("\nSeñal de cierre recibida. Procesando mensajes pendientes...")
     central_activa = False
+
+# Función para imprimir el tablero vacío
+def imprimir_tablero():
+    print("\nTablero Vacío:")
+    print("   " + "  ".join(str(i) for i in range(1, 21)))  # Encabezado de columnas
+    for row in range(20, 0, -1):  # Filas del tablero
+        line = f"{row:2d} |"  # Número de fila
+        for col in range(1, 21):  # Columna del tablero
+            line += "  "  # Espacios vacíos
+        print(line)
+    print("\n")  # Nueva línea para separar el tablero de la tabla de clientes
 
 # Función para imprimir la tabla de clientes solo si hay datos
 def imprimir_tabla():
@@ -119,6 +130,7 @@ def hilo_lector_mensajes(broker, cola_mensajes):
         'CLIENTES',
         bootstrap_servers=broker
     )
+    producer = KafkaProducer(bootstrap_servers=broker)
 
     for message in consumer:
         if not central_activa:
@@ -127,6 +139,15 @@ def hilo_lector_mensajes(broker, cola_mensajes):
         # Decodificar el mensaje recibido
         mensaje = message.value.decode('utf-8')
         print(f"Mensaje recibido: {mensaje}")
+
+        # Verificar si el cliente está pidiendo si la central está activa
+        if mensaje == "Central activa?":
+            cliente_id = message.key.decode('utf-8')  # ID del cliente desde el 'key'
+            respuesta = "Central está operativa"
+            producer.send('CENTRAL-CLIENTE', key=cliente_id.encode('utf-8'), value=respuesta.encode('utf-8'))
+            producer.flush()
+            print(f"Respondido al cliente {cliente_id}: {respuesta}")
+            continue  # Saltar al siguiente mensaje, no procesar destinos aún
 
         # Extraer el cliente y el destino del mensaje recibido
         try:
@@ -193,8 +214,10 @@ def iniciar_central(broker):
     # Establecer el manejador de la señal de cierre (Ctrl+C)
     signal.signal(signal.SIGINT, manejar_cierre)
 
-    # Imprimir la tabla vacía al inicio
+    # Imprimir el tablero vacío y la tabla vacía al inicio
+    imprimir_tablero()
     imprimir_tabla()
+
 
     # Crear e iniciar los hilos
     hilo_lector = threading.Thread(target=hilo_lector_mensajes, args=(broker, cola_mensajes))

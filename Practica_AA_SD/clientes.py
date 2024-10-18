@@ -50,16 +50,11 @@ Flujo de ejecución:
 """
 
 """
-Semáforo para sincronización:
-
-    Se ha añadido un semáforo (threading.Semaphore) para sincronizar el envío de los destinos. El productor espera hasta que el consumidor libere el semáforo, lo que ocurre cuando se recibe un mensaje OK desde la central.
-    Productor:
-
-    El productor envía un destino y luego espera a que el semáforo se libere (tras recibir la confirmación de la central). Una vez recibido el OK, procede al siguiente destino. Esto se repite hasta que se hayan enviado todos los destinos.
-    Consumidor:
-
-    El consumidor escucha el tópico CENTRAL-CLIENTE y verifica si el mensaje recibido es del formato ID:<cliente_id> OK. Cuando el mensaje corresponde al cliente y es válido, libera el semáforo, permitiendo al productor enviar el siguiente destino.
-
+Flujo del programa:
+    -El cliente envía un mensaje al broker con su destino.
+    -Si la central está disponible, se esperan las confirmaciones (IN y OK).
+    -Si la conexión con la central se pierde, se muestra un mensaje de advertencia y se intenta reconectar automáticamente cada 5 segundos.
+    -Una vez restablecida la conexión, el programa continúa desde donde se dejó.
 """
 
 """
@@ -109,6 +104,36 @@ def obtener_info_cliente(cliente_id, fichero):
         print(f"Error al procesar el fichero: {e}")
         return []
 
+# Función para verificar si la central está activa
+def verificar_central_activa(producer, consumer, cliente_id):
+    global salir_programa
+
+    mensaje_central_activa = "Central activa?"
+    while not salir_programa:
+        print(Fore.YELLOW + "Verificando si la central está activa...")
+        producer.produce('CLIENTES', key=cliente_id, value=mensaje_central_activa)
+        producer.flush()
+
+        tiempo_inicio = time.time()
+        while time.time() - tiempo_inicio < 5 and not salir_programa:
+            msg = consumer.poll(timeout=1.0)
+            if msg is None:
+                continue
+
+            if msg.error():
+                raise KafkaException(msg.error())
+
+            mensaje = msg.value().decode('utf-8')
+
+            if mensaje == "Central está operativa":
+                print(Fore.GREEN + "Central confirmada como operativa.")
+                print()
+                return True
+
+        print(Fore.RED + "No se recibió confirmación de la central en 5 segundos. Reintentando...\n")
+
+    return False
+
 # Función para enviar destino al tópico de Kafka y esperar confirmación
 def enviar_destinos_kafka(broker, cliente_id, destinos_cliente):
     global salir_programa
@@ -127,52 +152,61 @@ def enviar_destinos_kafka(broker, cliente_id, destinos_cliente):
     topic_cliente = 'CENTRAL-CLIENTE'
     consumer.subscribe([topic_cliente])
 
+    # Verificar si la central está activa antes de proceder
+    if not verificar_central_activa(producer, consumer, cliente_id):
+        print(Fore.RED + "Error: No se pudo verificar si la central está operativa. Saliendo...")
+        return
+
     for i, destino in enumerate(destinos_cliente):
         if salir_programa:
             break
 
-        # Enviar el destino
-        mensaje_ir_destino = f"Cliente '{cliente_id}' quiere ir a {destino}"
-        print(mensaje_ir_destino)
-        print(f"Esperando confirmación de recogida...")
-        producer.produce('CLIENTES', key=cliente_id, value=mensaje_ir_destino)
-        producer.flush()
+        mensaje_enviado = False
 
-        # Esperar la confirmación de recogida (IN)
-        while not salir_programa:
-            msg = consumer.poll(timeout=1.0)
-            if msg is None:
-                continue
+        while not mensaje_enviado and not salir_programa:
+            # Enviar el destino
+            mensaje_ir_destino = f"Cliente '{cliente_id}' quiere ir a {destino}"
+            print(mensaje_ir_destino)
+            print(f"Esperando confirmación de recogida...")
 
-            if msg.error():
-                raise KafkaException(msg.error())
+            # Enviar mensaje al tópico 'CLIENTES'
+            producer.produce('CLIENTES', key=cliente_id, value=mensaje_ir_destino)
+            producer.flush()
 
-            mensaje = msg.value().decode('utf-8')
-            
-            # Manejar error si se recibe "KO"
-            if mensaje == f"ID:{cliente_id} KO":
-                print()
-                print(Fore.RED + f"Error: Fracaso en la recogida del cliente '{cliente_id}' para el destino {destino}.")
-                print(Fore.GREEN + f"Saliendo de este destino y continuando con el siguiente...")
-                print()
-                break
+            # Esperar confirmación de recogida (IN) o volver a intentar después de 5 segundos
+            tiempo_inicio = time.time()
 
-            if mensaje == f"ID:{cliente_id} IN":
-                print()
-                print(Fore.GREEN + f"Confirmación recibida: Cliente recogido, yendo a {destino}")
-                print("Esperando confirmación de llegada...")
-                break
+            while time.time() - tiempo_inicio < 5 and not salir_programa:
+                msg = consumer.poll(timeout=1.0)
+                if msg is None:
+                    continue
+
+                if msg.error():
+                    raise KafkaException(msg.error())
+
+                mensaje = msg.value().decode('utf-8')
+
+                # Manejar error si se recibe "KO"
+                if mensaje == f"ID:{cliente_id} KO":
+                    print(Fore.RED + f"Error: Fracaso en la recogida del cliente '{cliente_id}' para el destino {destino}.")
+                    print(Fore.GREEN + "Saliendo de este destino y continuando con el siguiente...\n")
+                    break
+
+                if mensaje == f"ID:{cliente_id} IN":
+                    print(Fore.GREEN + f"Confirmación recibida: Cliente recogido, yendo a {destino}")
+                    print()
+                    print("Esperando confirmación de llegada...")
+                    mensaje_enviado = True
+                    break
+
+            if not mensaje_enviado:
+                print(Fore.YELLOW + "No se recibió confirmación en 5 segundos. Reintentando...\n")
 
         # Si se ha recibido un "KO", pasar al siguiente destino
         if mensaje == f"ID:{cliente_id} KO":
             continue
 
-        # Enviar mensaje de llegada
-        #mensaje_llegada = f"Cliente '{cliente_id}' ha llegado a {destino}"
-        #producer.produce('CLIENTES', key=cliente_id, value=mensaje_llegada)
-        #producer.flush()
-
-        # Esperar la confirmación de llegada (OK)
+        # Esperar confirmación de llegada (OK)
         while not salir_programa:
             msg = consumer.poll(timeout=1.0)
             if msg is None:
@@ -182,19 +216,16 @@ def enviar_destinos_kafka(broker, cliente_id, destinos_cliente):
                 raise KafkaException(msg.error())
 
             mensaje = msg.value().decode('utf-8')
-            
-            # Manejar error si se recibe "KO", tanto por si no hay taxis disponibles como si no se ha podido llegar al destino
-            if mensaje == f"ID:{cliente_id} KO":
-                print()
-                print(Fore.RED + f"Error: Fracaso en la llegada del cliente '{cliente_id}' a {destino}.")
-                print(Fore.GREEN + f"Saliendo de este destino y continuando con el siguiente...")
+
+            if mensaje == f"ID:{cliente_id} OK":
+                print(Fore.GREEN + f"Confirmación recibida: Cliente llegó a {destino}")
                 print()
                 break
 
-            if mensaje == f"ID:{cliente_id} OK":
-                print()
-                print(Fore.GREEN + f"Confirmación recibida: Cliente llegó a {destino}")
-                print()
+            # Manejar error si se recibe "KO"
+            if mensaje == f"ID:{cliente_id} KO":
+                print(Fore.RED + f"Error: Fracaso en la llegada del cliente '{cliente_id}' a {destino}.")
+                print(Fore.GREEN + "Saliendo de este destino y continuando con el siguiente...\n")
                 break
 
         # Si se ha recibido un "KO", pasar al siguiente destino
@@ -208,7 +239,6 @@ def enviar_destinos_kafka(broker, cliente_id, destinos_cliente):
             time.sleep(4)
 
     consumer.close()
-
 
 # Validar que la ID del cliente sea un único carácter en minúscula
 def validar_cliente_id(cliente_id):
@@ -235,4 +265,4 @@ if __name__ == "__main__":
 
     if not salir_programa:
         print(Fore.YELLOW + "Todos los destinos han sido procesados...")
-        print() 
+        print()
