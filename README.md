@@ -25,9 +25,19 @@ En relacion con la base de datos [BBDD]:
 ·El Destino (char)
 ·El estado (booleano)
 ·La coordenada (int)
+
+
+
 -Coordenada X
 -Coordenada Y
 
 En relacion al taxi:
 -Hemos decidido que el digital engine sera el servidor por lo tanto en los argumentos del digital engine no vamos a poner que esten ni la ip ni el puerto del servidor,
 con lo que el servidor no hace falta que conozca la ip ni el puerto del cliente.
+
+
+
+
+%KAFKA_HOME%\bin\windows\zookeeper-server-start.bat .\config\zookeeper.properties
+
+%KAFKA_HOME%\bin\windows\kafka-server-start.bat .\config\server.properties

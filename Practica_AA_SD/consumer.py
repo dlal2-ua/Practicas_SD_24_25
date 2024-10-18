@@ -1,5 +1,5 @@
 import sqlite3
-from confluent_kafka import Consumer, KafkaError
+from kafka import Consumer, KafkaError
 from funciones_generales import update_datos_taxi, leer_existencia_taxi, insert_datos_taxi
 
 
