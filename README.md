@@ -39,4 +39,5 @@ con lo que el servidor no hace falta que conozca la ip ni el puerto del cliente.
 
 
 %KAFKA_HOME%\bin\windows\zookeeper-server-start.bat .\config\zookeeper.properties
+
 %KAFKA_HOME%\bin\windows\kafka-server-start.bat .\config\server.properties
