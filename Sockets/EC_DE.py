@@ -17,12 +17,9 @@ def start():
     server.listen()
     while True:
         conn, addr = server.accept()
-        msg_length = int(conn.recv(HEADER).decode(FORMAT))
-        msg = conn.recv(msg_length).decode(FORMAT)
-        print(msg)
+        msg = conn.recv(1024).decode('utf-8')
         while msg != FIN:
-            msg_length = int(conn.recv(HEADER).decode(FORMAT))
-            msg = conn.recv(msg_length).decode(FORMAT)
+            msg = conn.recv(1024).decode('utf-8')
             print(msg)
         conn.close()
         exit(1)
@@ -47,11 +44,6 @@ ADDR_CLIENT = (SERVER_CLIENT,PORT_CLIENT)"""
 
 
 #Función servidor con el sensor
-"""t2= threading.Thread(target=start)
-t2.start()
-
-t1= threading.Thread(target=handle_server)
-t1.start()"""
 start()
 
 

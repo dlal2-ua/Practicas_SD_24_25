@@ -3,25 +3,17 @@ import sys
 import time
 import threading
 import select
-import keyboard
 
 
 HEADER = 64
 FORMAT= 'utf-8'
 FIN = "FIN"
+MSG = "OK"
 
 
-def send(msg):
-    message = msg.encode(FORMAT)
-    msg_length = len(message)
-    send_length = str(msg_length).encode(FORMAT)
-    send_length += b' ' * (HEADER - len(send_length))
-    client.send(send_length)
-    client.send(message)
-def sendmsg(msg):
-    while keyboard.is_pressed()==False:
-        send(msg)
-        
+def sendmsg(client):
+    while True:
+        client.sendall(MSG.encode('utf-8'))
         time.sleep(1)
         
 
@@ -32,10 +24,12 @@ if(len(sys.argv)==3):
     ADDR = (SERVER,PORT)
     client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     client.connect(ADDR)
-    msg="OK"
-    t1 = threading.Thread(target=sendmsg(msg))
-    aux=input()
-    t1.start()
+    threading.Thread(target=sendmsg, args=(client,), daemon=True).start()
+    while True:
+        user_input = input()
+        MSG = "KO"
+        user_input = input()
+        MSG = "OK"
 
 else:
     print("Los argumentos introducidos no son los correctos.El formato es: <IP> <Puerto del EC_DE>")
