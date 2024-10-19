@@ -6,23 +6,30 @@ import sys
 HEADER = 64
 SERVER = socket.gethostbyname(socket.gethostname())
 PORT = 5050
-ADDR=(SERVER,PORT)
 FORMAT = 'utf-8'
 FIN = "FIN"
 
 
 def start():
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    ADDR=(SERVER,PORT)
     server.bind(ADDR)
+    print(f"Puerto en el que está escuchando: {PORT}")
     server.listen()
+
     while True:
-        conn, addr = server.accept()
-        msg = conn.recv(1024).decode('utf-8')
-        while msg != FIN:
+        try:
+            conn, addr = server.accept()
             msg = conn.recv(1024).decode('utf-8')
-            print(msg)
-        conn.close()
-        exit(1)
+            while msg:
+                msg = conn.recv(1024).decode('utf-8')
+                print(msg)
+            conn.close()
+        except ConnectionResetError:
+            print("El sensor se ha perdido, esperando a que se conecte otro...")
+        
+
+
         
 """def handle_server():
     client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -44,9 +51,11 @@ ADDR_CLIENT = (SERVER_CLIENT,PORT_CLIENT)"""
 
 
 #Función servidor con el sensor
-start()
-
-
+while True:
+    try:
+        start()
+    except OSError:
+        PORT += 1
 
 
 
