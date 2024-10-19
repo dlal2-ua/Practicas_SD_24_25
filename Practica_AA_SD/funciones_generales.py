@@ -1,5 +1,17 @@
 import sqlite3
 
+#================================================================================================
+
+# Conectar a la base de datos SQLite
+def conectar_bd():
+    conexion = sqlite3.connect('database.db')  # Cambia a la ruta de tu base de datos
+    return conexion
+
+#================================================================================================
+
+
+
+
 # Función para insertar datos en la base de datos
 def update_datos_taxi(id, destino, estado, coordX, coordY):
     # Conectar a la base de datos
