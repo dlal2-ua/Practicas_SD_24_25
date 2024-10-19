@@ -15,8 +15,8 @@ def sendmsg(client):
         while True:
             client.sendall(MSG.encode('utf-8'))
             time.sleep(1)
-    except ConnectionAbortedError:
-        print(f"Se ha perdido la conexion con el DE con puerto {sys.argv[2]}. Voy a morir")
+    except (ConnectionAbortedError,ConnectionResetError):
+        print(f"Se ha perdido la conexion con el DE con puerto {sys.argv[2]}.")
         client.close()
         raise SystemExit(1)
 if(len(sys.argv)==3):

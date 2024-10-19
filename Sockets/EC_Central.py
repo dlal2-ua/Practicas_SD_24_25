@@ -6,6 +6,7 @@ import time
 import queue
 import pandas as pd
 import signal
+import sqlite3
 
 HEADER = 64
 SERVER = socket.gethostbyname(socket.gethostname())
@@ -170,46 +171,42 @@ def iniciar_central(broker):
     print("Central cerrada correctamente.")
 
 # Ejecución del programa
-if __name__ == "__main__": 
+"""if __name__ == "__main__": 
     broker = '127.0.0.1:9092'  # Dirección del broker de Kafka
-    iniciar_central(broker)
+    iniciar_central(broker)"""
 
 
 #=======================================================================================================================================================================
 #=======================================================================================================================================================================
+def buscar_taxi_arg(msg):
+    conexion = sqlite3.connect('../database.db')
+    query = f"Select id from taxis where id == {msg}"
+    df_busqueda = pd.read_sql_query(query,conexion)
+    if df_busqueda.empty:
+        return False
+    else:
+        return True
 
 def handle_client(conn, addr):
-    msg_length = int(conn.recv(HEADER).decode(FORMAT))
-    msg = conn.recv(msg_length).decode(FORMAT)
-    if msg == "3" or msg == "4" or msg == "5":
+    msg = conn.recv(1024).decode(FORMAT)
+    if buscar_taxi_arg(msg):
         print(f"El taxi con id {msg} está autentificado")
+        conn.send("Taxi correctamente autentificado".encode(FORMAT))
     else:
         print(f"Se ha intentado conectar el taxi con id {msg} pero no está en la bbdd")
-        conn.send("Este taxi no está registrado".encode(FORMAT))
+        conn.send("Este taxi no está registrado en la bbdd".encode(FORMAT))
     conn.close()
 
 def start():
-    server.listen()
-    CONEX_ACTIVAS = threading.active_count()-1
-    print(CONEX_ACTIVAS)
-    while True:
-        conn, addr = server.accept()
-        CONEX_ACTIVAS = threading.active_count()
-        if (CONEX_ACTIVAS <= MAX_CONEXIONES): 
-            thread = threading.Thread(target=handle_client, args=(conn, addr))
-            thread.start()
-            print(f"[CONEXIONES ACTIVAS] {CONEX_ACTIVAS}")
-            print("CONEXIONES RESTANTES PARA CERRAR EL SERVICIO", MAX_CONEXIONES-CONEX_ACTIVAS)
-        else:
-            print("OOppsss... DEMASIADAS CONEXIONES. ESPERANDO A QUE ALGUIEN SE VAYA")
-            conn.send("OOppsss... DEMASIADAS CONEXIONES. Tendrás que esperar a que alguien se vaya".encode(FORMAT))
-            conn.close()
-            CONEX_ACTUALES = threading.active_count()-1
-
-
-if(len(sys.argv)==4):
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.bind(ADDR)
+    server.listen()
+    while True:
+        conn, addr = server.accept()
+        handle_client(conn,addr)
+
+
+if(len(sys.argv)==3):
     start()
 else:
-    print("Los argumentos introducidos no son los correctos.El formato es:<IP gestor de colas> <puerto del broker del gestor de colas> <IP y puerto de la BBDD>")
+    print("Los argumentos introducidos no son los correctos.El formato es:<IP gestor de colas> <puerto del broker del gestor de colas>")
