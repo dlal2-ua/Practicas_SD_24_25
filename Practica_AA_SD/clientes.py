@@ -173,10 +173,10 @@ def enviar_destinos_kafka(broker, cliente_id, destinos_cliente):
             producer.produce('CLIENTES', key=cliente_id, value=mensaje_ir_destino)
             producer.flush()
 
-            # Esperar confirmación de recogida (IN) o volver a intentar después de 5 segundos
+            # Esperar confirmación de recogida (IN) o volver a intentar después de 10 segundos
             tiempo_inicio = time.time()
 
-            while time.time() - tiempo_inicio < 5 and not salir_programa:
+            while time.time() - tiempo_inicio < 10 and not salir_programa:
                 msg = consumer.poll(timeout=1.0)
                 if msg is None:
                     continue
@@ -200,7 +200,7 @@ def enviar_destinos_kafka(broker, cliente_id, destinos_cliente):
                     break
 
             if not mensaje_enviado:
-                print(Fore.YELLOW + "No se recibió confirmación en 5 segundos. Reintentando...\n")
+                print(Fore.YELLOW + "No se recibió confirmación en 10 segundos. Reintentando...\n")
 
         # Si se ha recibido un "KO", pasar al siguiente destino
         if mensaje == f"ID:{cliente_id} KO":

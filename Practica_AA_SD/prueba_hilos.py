@@ -7,6 +7,7 @@ import signal
 import sys
 import matplotlib.pyplot as plt
 import numpy as np
+from funciones_generales import conectar_bd
 
 """
 DEMO DE CENTRAL PARA PROBAR CLIENTES:
@@ -26,39 +27,9 @@ DEMO DE CENTRAL PARA PROBAR CLIENTES:
     
 """
 
-"""
-# Función para actuar como consumidor
-def consume_messages():
-    consumer = KafkaConsumer('CLIENTES', bootstrap_servers='127.0.0.1:9092')
-    for message in consumer:
-        print(f"Mensaje recibido: {message.value.decode('utf-8')}")
 
-# Función para actuar como productor
-def produce_messages():
-    producer = KafkaProducer(bootstrap_servers='127.0.0.1:9092')
-    while True:
-        mensaje = input("Ingresa un mensaje para enviar: ")
-        producer.send('CENTRAL-CLIENTE', mensaje.encode('utf-8'))
-        producer.flush()
-        time.sleep(1)
-
-
-# Crear hilos para ejecutar productor y consumidor simultáneamente
-if __name__ == "__main__":
-    consumer_thread = Thread(target=consume_messages)
-    producer_thread = Thread(target=produce_messages)
-
-    # Iniciar ambos hilos
-    consumer_thread.start()
-    producer_thread.start()
-
-    # Esperar que ambos hilos terminen (esto ocurre cuando terminen de ejecutarse sus loops)
-    consumer_thread.join()
-    producer_thread.join()
 
 """
-
-
 # Inicializar una tabla (DataFrame) con las columnas ID, DESTINO, ESTADO
 tabla = pd.DataFrame(columns=["ID", "DESTINO", "ESTADO"])
 
@@ -77,16 +48,7 @@ def manejar_cierre(signal, frame):
     print("\nSeñal de cierre recibida. Procesando mensajes pendientes...")
     central_activa = False
 
-# Función para imprimir el tablero vacío
-def imprimir_tablero():
-    print("\nTablero Vacío:")
-    print("   " + "  ".join(str(i) for i in range(1, 21)))  # Encabezado de columnas
-    for row in range(20, 0, -1):  # Filas del tablero
-        line = f"{row:2d} |"  # Número de fila
-        for col in range(1, 21):  # Columna del tablero
-            line += "  "  # Espacios vacíos
-        print(line)
-    print("\n")  # Nueva línea para separar el tablero de la tabla de clientes
+
 
 # Función para imprimir la tabla de clientes solo si hay datos
 def imprimir_tabla():
@@ -209,13 +171,18 @@ def procesar_mensajes(broker, cola_mensajes):
     exit(0)  # Salir del hilo si la central está cerrando y la cola está vacía
     print("Procesamiento de la cola completado. Cerrando el hilo procesador...")
 
+
+
+
+
+
+
 # Función principal
 def iniciar_central(broker):
     # Establecer el manejador de la señal de cierre (Ctrl+C)
     signal.signal(signal.SIGINT, manejar_cierre)
 
     # Imprimir el tablero vacío y la tabla vacía al inicio
-    imprimir_tablero()
     imprimir_tabla()
 
 
@@ -235,4 +202,264 @@ def iniciar_central(broker):
 # Ejecución del programa
 if __name__ == "__main__": 
     broker = '127.0.0.1:9092'  # Dirección del broker de Kafka
+    iniciar_central(broker)
+
+    """
+
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from kafka import KafkaConsumer, KafkaProducer
+import threading
+import queue
+import time
+import signal
+
+# Inicializar una tabla (DataFrame) con las columnas ID, DESTINO, ESTADO
+tabla = pd.DataFrame(columns=["ID", "DESTINO", "ESTADO"])
+
+# Cola para almacenar los mensajes entrantes de los clientes
+cola_mensajes = queue.Queue()
+
+# Cola para la información del tablero
+cola_tablero = queue.Queue()
+
+# Lista para mantener un registro de clientes que ya están en el tablero
+clientes_tablero = set()
+
+# Bloqueo para sincronizar la tabla
+lock = threading.Lock()
+
+# ** Lista global para mantener todos los clientes visibles en el tablero
+clientes_a_mostrar_global = []
+
+# Variable para controlar si la central está activa
+central_activa = True
+
+# Manejador de la señal SIGINT para cerrar la central limpiamente
+def manejar_cierre(signal, frame):
+    global central_activa
+    print("\nSeñal de cierre recibida. Procesando mensajes pendientes...")
+    central_activa = False
+
+# Función para imprimir la tabla de clientes solo si hay datos
+def imprimir_tabla():
+    global tabla
+    print("\nTabla de Clientes:")
+    print("+---------+---------+------------+")
+    print("|   ID    | DESTINO |   ESTADO   |")
+    print("+---------+---------+------------+")
+    if not tabla.empty:
+        for _, row in tabla.iterrows():
+            print(f"|   {row['ID']:<5}  | {row['DESTINO']:<7} | {row['ESTADO']:<10} |")
+    else:
+        print("|          NO HAY DATOS          |")
+    print("+---------+---------+------------+")
+
+# Función para actualizar la tabla de clientes
+def actualizar_tabla(cliente_id, destino):
+    global tabla
+    with lock:
+        # Verificar si el cliente ya está en la tabla
+        if cliente_id in tabla['ID'].values:
+            # Actualizar el destino y estado del cliente existente
+            tabla.loc[tabla['ID'] == cliente_id, ['DESTINO', 'ESTADO']] = [destino, 'EN ESPERA']
+            print(f"\nActualización: Cliente {cliente_id} actualizado con destino {destino}. Estado: EN ESPERA.")
+        else:
+            # Agregar un nuevo cliente a la tabla si no existe
+            nueva_fila = pd.DataFrame({
+                "ID": [cliente_id],
+                "DESTINO": [destino],
+                "ESTADO": ["EN ESPERA"]
+            })
+            tabla = pd.concat([tabla, nueva_fila], ignore_index=True)
+            print(f"\nNuevo cliente añadido: {cliente_id}. Destino: {destino}. Estado: EN ESPERA.")
+
+        # Imprimir la tabla actualizada
+        imprimir_tabla()
+
+
+# Función para recibir mensajes de clientes y actualizar la tabla
+def hilo_lector_mensajes(broker, cola_mensajes, conexion):
+    consumer = KafkaConsumer('CLIENTES', bootstrap_servers=broker)
+    producer = KafkaProducer(bootstrap_servers=broker)
+
+    for message in consumer:
+        if not central_activa:
+            break  # Terminar el hilo si la central está cerrando
+
+        # Decodificar el mensaje recibido
+        mensaje = message.value.decode('utf-8')
+        print(f"Mensaje recibido: {mensaje}")
+
+        # Verificar si el cliente está pidiendo si la central está activa
+        if mensaje == "Central activa?":
+            cliente_id = message.key.decode('utf-8')  # ID del cliente desde el 'key'
+            respuesta = "Central está operativa"
+            producer.send('CENTRAL-CLIENTE', key=cliente_id.encode('utf-8'), value=respuesta.encode('utf-8'))
+            producer.flush()
+            print(f"Respondido al cliente {cliente_id}: {respuesta}")
+            continue  # Saltar al siguiente mensaje, no procesar destinos aún
+
+        # Extraer el cliente y el destino del mensaje recibido
+        try:
+            partes = mensaje.split()
+            cliente_id = partes[1].strip("'")  # Extraer ID del cliente sin las comillas
+            destino = partes[-1]  # El último valor es el destino
+        except IndexError:
+            print(f"Error procesando el mensaje: {mensaje}")
+            continue
+
+        # Obtener coordenadas iniciales del cliente
+        coordX, coordY = obtener_pos_inicial_cliente(cliente_id)
+        
+        # Añadir el mensaje a la cola de mensajes para procesarlo
+        cola_mensajes.put((cliente_id, destino))  # Guardar también las coordenadas
+
+        # Si el cliente no está en el tablero, añadirlo
+        if cliente_id not in clientes_tablero:
+            # Añadir el cliente a la cola del tablero para actualizar la posición en el mapa
+            cola_tablero.put((cliente_id, destino, (coordX, coordY)))
+            clientes_tablero.add(cliente_id)  # Marcar cliente como añadido al tablero
+
+        # ** Añadir el cliente a la lista global
+        clientes_a_mostrar_global.append((cliente_id, destino, (coordX, coordY)))
+
+        # Actualizar la tabla con la nueva información
+        actualizar_tabla(cliente_id, destino)
+
+        # Simula un pequeño retraso entre mensajes
+        time.sleep(1)
+
+"""
+# Función para procesar la cola de mensajes y enviar confirmación
+def procesar_mensajes(broker, cola_mensajes):
+    producer = KafkaProducer(bootstrap_servers=broker)
+
+    while central_activa or not cola_mensajes.empty():
+        if not cola_mensajes.empty():
+            cliente_id, destino = cola_mensajes.get()
+
+            # Simular procesamiento del destino y cambiar el estado a "EN TAXI"
+            with lock:
+                tabla.loc[tabla['ID'] == cliente_id, 'ESTADO'] = 'EN TAXI'
+
+            # Imprimir la tabla actualizada
+            imprimir_tabla()
+
+            # Enviar confirmación al cliente a través del tópico 'CENTRAL-CLIENTE'
+            mensaje_confirmacion = f"ID:{cliente_id} IN"
+            producer.send('CENTRAL-CLIENTE', key=cliente_id.encode('utf-8'), value=mensaje_confirmacion.encode('utf-8'))
+            producer.flush()
+            print(f"Confirmación enviada al cliente {cliente_id}: {mensaje_confirmacion}")
+
+            time.sleep(5)  # Simula un pequeño retraso en el procesamiento de cada mensaje
+
+            # Simular procesamiento del destino y cambiar el estado a "HA LLEGADO"
+            with lock:
+                tabla.loc[tabla['ID'] == cliente_id, 'ESTADO'] = 'HA LLEGADO'
+
+            # Imprimir la tabla actualizada
+            imprimir_tabla()
+
+            # Enviar confirmación al cliente a través del tópico 'CENTRAL-CLIENTE'
+            mensaje_confirmacion = f"ID:{cliente_id} OK"
+            producer.send('CENTRAL-CLIENTE', key=cliente_id.encode('utf-8'), value=mensaje_confirmacion.encode('utf-8'))
+            producer.flush()
+            print(f"Confirmación enviada al cliente {cliente_id}: {mensaje_confirmacion}")
+
+        time.sleep(5)  # Simula un pequeño retraso en el procesamiento de cada mensaje
+
+    exit(0)  # Salir del hilo si la central está cerrando y la cola está vacía
+    print("Procesamiento de la cola completado. Cerrando el hilo procesador...")
+"""
+
+
+# Función para obtener destinos desde la base de datos
+def obtener_destinos(conexion):
+    query = "SELECT destino, coordX, coordY FROM destinos"
+    df_destinos = pd.read_sql_query(query, conexion)
+    destinos_dict = {row['destino']: (row['coordX'], row['coordY']) for _, row in df_destinos.iterrows()}
+    return destinos_dict
+
+
+
+# Función para obtener las coordenadas iniciales del cliente
+def obtener_pos_inicial_cliente(cliente_id):
+    # Establecer una nueva conexión a la base de datos para cada hilo
+    conexion = conectar_bd()
+    try:
+        # Usar parámetros en la consulta para evitar inyección SQL
+        query = "SELECT coordX, coordY FROM pos_inicial_cliente WHERE id = ?"
+        df_pos_inicial = pd.read_sql_query(query, conexion, params=(cliente_id,))
+        if not df_pos_inicial.empty:
+            return df_pos_inicial['coordX'][0], df_pos_inicial['coordY'][0]
+        else:
+            print(f"No se encontraron coordenadas para el cliente {cliente_id}.")
+            return None, None  # Manejo del error
+    finally:
+        conexion.close()  # Asegúrate de cerrar la conexión después de usarla
+
+
+
+# Función para crear y actualizar el tablero
+def actualizar_tablero(ax, destinos, clientes):
+    # Eliminar parches anteriores
+    for patch in ax.patches:
+        patch.remove()
+
+    for txt in ax.texts:
+        txt.remove()
+
+    # Agregar destinos al tablero (que son estáticos)
+    for label, (x, y) in destinos.items():
+        ax.add_patch(plt.Rectangle((x - 1, y - 1), 1, 1, color="deepskyblue"))
+        ax.text(x - 0.5, y - 0.5, label, va='center', ha='center', fontsize=10, color="black")
+
+    # Agregar clientes en su posición inicial
+    for cliente_id, destino, (coordX, coordY) in clientes:
+        ax.add_patch(plt.Rectangle((coordX - 1, coordY - 1), 1, 1, color="yellow"))
+        ax.text(coordX - 0.5, coordY - 0.5, cliente_id, fontsize=10, ha='center', va='center', color='black')
+
+    plt.draw()
+    plt.pause(0.01)
+
+# Función principal
+def iniciar_central(broker):
+    signal.signal(signal.SIGINT, manejar_cierre)
+    imprimir_tabla()
+
+    fig, ax = plt.subplots(figsize=(8, 8))
+    grid_size = 20
+
+    ax.set_xlim(0.1, grid_size)
+    ax.set_ylim(0.1, grid_size)
+    ax.set_xticks(np.arange(1, grid_size + 1))
+    ax.set_yticks(np.arange(1, grid_size + 1))
+    ax.grid(True)
+    ax.set_xticklabels([])
+    ax.set_yticklabels([])
+    ax.invert_yaxis()
+    ax.tick_params(axis='both', which='both', length=0)
+
+    conexion = conectar_bd()
+    destinos = obtener_destinos(conexion)
+    actualizar_tablero(ax, destinos, [])
+
+    hilo_lector = threading.Thread(target=hilo_lector_mensajes, args=(broker, cola_mensajes, conexion))
+    hilo_lector.start()
+
+    while central_activa:
+        # Actualizar el tablero con todos los clientes en la lista global
+        if clientes_a_mostrar_global:
+            actualizar_tablero(ax, destinos, clientes_a_mostrar_global)
+
+        plt.pause(0.1)
+
+    hilo_lector.join()
+    print("Central cerrada correctamente.")
+
+if __name__ == "__main__":
+    broker = '127.0.0.1:9092'
     iniciar_central(broker)
