@@ -13,8 +13,6 @@ SERVER = socket.gethostbyname(socket.gethostname())
 PORT = 6060
 ADDR=(SERVER,PORT)
 FORMAT = 'utf-8'
-FIN = "FIN"
-MAX_CONEXIONES = 4
 
 
 #=======================================================================================================================================================================
@@ -178,6 +176,28 @@ def iniciar_central(broker):
 
 #=======================================================================================================================================================================
 #=======================================================================================================================================================================
+def leer_coord(broker):
+    consumer = KafkaConsumer(
+        'TAXI',
+        bootstrap_servers=broker,
+        auto_offset_reset='earliest',  
+        enable_auto_commit=True,  
+    )
+
+    for mensaje in consumer:
+        msg = mensaje.value.decode('utf-8')  
+        print(f"Mensaje recibido: {msg}") 
+        try:
+            partes = mensaje.split(",")
+            taxi_id = int(partes[0])
+            coordX_taxi = int(partes[1])  # Coordenada X
+            coordY_taxi = int(partes[2])  # Coordenada Y
+        except IndexError:
+            print(f"Error procesando el mensaje del taxi: {mensaje}")
+            continue
+        break
+    consumer.close()
+
 def buscar_taxi_arg(msg):
     conexion = sqlite3.connect('../database.db')
     query = f"Select id from taxis where id == {msg}"
@@ -187,26 +207,31 @@ def buscar_taxi_arg(msg):
     else:
         return True
 
-def handle_client(conn, addr):
+def handle_client(conn, addr,broker):
     msg = conn.recv(1024).decode(FORMAT)
     if buscar_taxi_arg(msg):
         print(f"El taxi con id {msg} está autentificado")
         conn.send("Taxi correctamente autentificado".encode(FORMAT))
+        leer_coord(broker)
+        #hilo_lector_taxis(broker)
     else:
         print(f"Se ha intentado conectar el taxi con id {msg} pero no está en la bbdd")
         conn.send("Este taxi no está registrado en la bbdd".encode(FORMAT))
     conn.close()
 
-def start():
+def start(broker):
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.bind(ADDR)
     server.listen()
     while True:
         conn, addr = server.accept()
-        handle_client(conn,addr)
+        handle_client(conn,addr,broker)
 
 
 if(len(sys.argv)==3):
-    start()
+    ip_broker = sys.argv[1]
+    puerto_broker = sys.argv[2]
+    broker = f'{ip_broker}:{puerto_broker}'
+    start(broker)
 else:
     print("Los argumentos introducidos no son los correctos.El formato es:<IP gestor de colas> <puerto del broker del gestor de colas>")
