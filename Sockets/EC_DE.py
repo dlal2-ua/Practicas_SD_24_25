@@ -18,7 +18,7 @@ def enviar_coord(broker):
     coordenada = id_taxi + ",6,5"
 
     print(f"Mensaje enviado: {coordenada}")
-    producer.send('TAXI', value=coordenada.encode('utf-8'))
+    producer.send('TAXIS', value=coordenada.encode('utf-8'))
     producer.flush()
     producer.close()
 #Función cliente con la central
