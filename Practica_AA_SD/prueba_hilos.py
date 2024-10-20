@@ -87,7 +87,7 @@ def actualizar_tabla(cliente_id, destino):
         imprimir_tabla()
 
 # Función para recibir mensajes de clientes y actualizar la tabla
-def hilo_lector_mensajes(broker, cola_mensajes):
+def hilo_lector_cliente(broker, cola_mensajes):
     consumer = KafkaConsumer(
         'CLIENTES',
         bootstrap_servers=broker
@@ -187,7 +187,7 @@ def iniciar_central(broker):
 
 
     # Crear e iniciar los hilos
-    hilo_lector = threading.Thread(target=hilo_lector_mensajes, args=(broker, cola_mensajes))
+    hilo_lector = threading.Thread(target=hilo_lector_cliente, args=(broker, cola_mensajes))
     hilo_procesador = threading.Thread(target=procesar_mensajes, args=(broker, cola_mensajes))
     
     hilo_lector.start()
@@ -281,9 +281,12 @@ def actualizar_tabla(cliente_id, destino):
 
 
 # Función para recibir mensajes de clientes y actualizar la tabla
-def hilo_lector_mensajes(broker, cola_mensajes, conexion):
+def hilo_lector_cliente(broker, cola_mensajes):
     consumer = KafkaConsumer('CLIENTES', bootstrap_servers=broker)
     producer = KafkaProducer(bootstrap_servers=broker)
+
+    # Aquí abrimos una nueva conexión en el hilo actual
+    conexion = conectar_bd()
 
     for message in consumer:
         if not central_activa:
@@ -313,7 +316,7 @@ def hilo_lector_mensajes(broker, cola_mensajes, conexion):
 
         # Obtener coordenadas iniciales del cliente
         coordX, coordY = obtener_pos_inicial_cliente(cliente_id)
-        
+
         # Añadir el mensaje a la cola de mensajes para procesarlo
         cola_mensajes.put((cliente_id, destino))  # Guardar también las coordenadas
 
@@ -329,24 +332,74 @@ def hilo_lector_mensajes(broker, cola_mensajes, conexion):
         # Actualizar la tabla con la nueva información
         actualizar_tabla(cliente_id, destino)
 
+        # ==============
+        # Obtener un taxi disponible desde la base de datos
+        taxi_asignado = obtener_taxi_disponible(conexion)
+
+        if taxi_asignado:
+            # Obtener coordenadas iniciales del cliente
+            coordX_cliente, coordY_cliente = obtener_pos_inicial_cliente(cliente_id)
+
+            if coordX_cliente is not None and coordY_cliente is not None:
+                mensaje_asignacion = f"ID:{cliente_id} ASIGNADO TAXI:{taxi_asignado} COORDENADAS:{coordX_cliente},{coordY_cliente} DESTINO:{destino}"
+                print(f"Taxi asignado: {taxi_asignado} al cliente {cliente_id} en coordenadas {coordX_cliente}, {coordY_cliente}")
+
+                # Enviar el mensaje de asignación al taxi con las coordenadas del cliente y el destino
+                producer.send('CENTRAL-CLIENTE', key=cliente_id.encode('utf-8'), value=mensaje_asignacion.encode('utf-8'))
+                producer.flush()
+            else:
+                print(f"No se encontraron coordenadas para el cliente {cliente_id}, no se puede asignar taxi.")
+        else:
+            print(f"No hay taxis disponibles para el cliente {cliente_id}")
+        # ==============
+
         # Simula un pequeño retraso entre mensajes
         time.sleep(1)
 
-"""
-# Función para procesar la cola de mensajes y enviar confirmación
-def procesar_mensajes(broker, cola_mensajes):
+
+
+# Función para escuchar las coordenadas de los taxis y procesar si ha llegado al cliente o destino
+def hilo_lector_taxis(broker):
+    consumer = KafkaConsumer('CENTRAL-TAXI', bootstrap_servers=broker)
+
+    while central_activa:
+        for message in consumer:
+            # Decodificar el mensaje recibido del taxi
+            mensaje = message.value.decode('utf-8')
+            print(f"Mensaje recibido del taxi: {mensaje}")
+
+            # Extraer el ID del taxi y sus coordenadas
+            try:
+                partes = mensaje.split()
+                taxi_id = partes[1].strip("'")
+                coordX_taxi = float(partes[3].split(',')[0])  # Coordenada X
+                coordY_taxi = float(partes[3].split(',')[1])  # Coordenada Y
+            except IndexError:
+                print(f"Error procesando el mensaje del taxi: {mensaje}")
+                continue
+
+            # Verificar si el taxi está asignado a un cliente y comparar coordenadas
+            procesar_coordenadas_taxi(taxi_id, coordX_taxi, coordY_taxi)
+
+
+
+
+
+# Función para procesar las coordenadas del taxi y verificar si ha llegado al cliente o destino
+def procesar_coordenadas_taxi(taxi_id, coordX_taxi, coordY_taxi):
+
     producer = KafkaProducer(bootstrap_servers=broker)
 
-    while central_activa or not cola_mensajes.empty():
-        if not cola_mensajes.empty():
-            cliente_id, destino = cola_mensajes.get()
+    # Buscar si este taxi está asignado a algún cliente en el sistema
+    for cliente in clientes_a_mostrar_global:
+        cliente_id, destino, (coordX_cliente, coordY_cliente) = cliente
 
-            # Simular procesamiento del destino y cambiar el estado a "EN TAXI"
+        # Verificar si el taxi ha llegado a la posición del cliente
+        if abs(coordX_taxi - coordX_cliente) < 0.1 and abs(coordY_taxi - coordY_cliente) < 0.1:
+            print(f"Taxi {taxi_id} ha recogido al cliente {cliente_id}.")
+            # Actualizar el estado del cliente en la tabla a 'EN TAXI'
             with lock:
                 tabla.loc[tabla['ID'] == cliente_id, 'ESTADO'] = 'EN TAXI'
-
-            # Imprimir la tabla actualizada
-            imprimir_tabla()
 
             # Enviar confirmación al cliente a través del tópico 'CENTRAL-CLIENTE'
             mensaje_confirmacion = f"ID:{cliente_id} IN"
@@ -354,26 +407,36 @@ def procesar_mensajes(broker, cola_mensajes):
             producer.flush()
             print(f"Confirmación enviada al cliente {cliente_id}: {mensaje_confirmacion}")
 
-            time.sleep(5)  # Simula un pequeño retraso en el procesamiento de cada mensaje
+            # Enviar el destino al taxi
+            conexion = conectar_bd()
+            destino_coords = obtener_destino_coords(conexion, destino)
+            conexion.close()
 
-            # Simular procesamiento del destino y cambiar el estado a "HA LLEGADO"
+            if destino_coords:
+                coordX_destino, coordY_destino = destino_coords
+                mensaje_destino = f"ID:{cliente_id} DESTINO COORDENADAS:{coordX_destino},{coordY_destino}"
+                producer.send('CENTRAL-CLIENTE', key=cliente_id.encode('utf-8'), value=mensaje_destino.encode('utf-8'))
+                producer.flush()
+                print(f"Enviado al taxi {taxi_id} las coordenadas del destino {destino}: {coordX_destino}, {coordY_destino}.")
+
+        # Verificar si el taxi ha llegado al destino
+        if destino_coords and abs(coordX_taxi - coordX_destino) < 0.1 and abs(coordY_taxi - coordY_destino) < 0.1:
+            print(f"Taxi {taxi_id} ha llegado al destino del cliente {cliente_id}.")
+            # Actualizar el estado del cliente a 'HA LLEGADO'
             with lock:
                 tabla.loc[tabla['ID'] == cliente_id, 'ESTADO'] = 'HA LLEGADO'
 
-            # Imprimir la tabla actualizada
-            imprimir_tabla()
-
-            # Enviar confirmación al cliente a través del tópico 'CENTRAL-CLIENTE'
+            # Enviar confirmación al cliente de que ha llegado al destino
             mensaje_confirmacion = f"ID:{cliente_id} OK"
             producer.send('CENTRAL-CLIENTE', key=cliente_id.encode('utf-8'), value=mensaje_confirmacion.encode('utf-8'))
             producer.flush()
             print(f"Confirmación enviada al cliente {cliente_id}: {mensaje_confirmacion}")
 
-        time.sleep(5)  # Simula un pequeño retraso en el procesamiento de cada mensaje
+            # Liberar el taxi
+            liberar_taxi(conexion, taxi_id)
 
-    exit(0)  # Salir del hilo si la central está cerrando y la cola está vacía
-    print("Procesamiento de la cola completado. Cerrando el hilo procesador...")
-"""
+
+
 
 
 # Función para obtener destinos desde la base de datos
@@ -383,6 +446,31 @@ def obtener_destinos(conexion):
     destinos_dict = {row['destino']: (row['coordX'], row['coordY']) for _, row in df_destinos.iterrows()}
     return destinos_dict
 
+
+# Función para liberar un taxi después de completar el viaje
+def liberar_taxi(conexion, taxi_id):
+    cursor = conexion.cursor()
+    cursor.execute("UPDATE taxis SET estado = 1 WHERE id = ?", (taxi_id,))
+    conexion.commit()  # Asegurar que los cambios se guarden en la base de datos
+
+
+
+# Función para obtener un taxi disponible desde la base de datos
+def obtener_taxi_disponible(conexion):
+    cursor = conexion.cursor()
+
+    # Consulta para seleccionar un taxi disponible (estado = 1)
+    cursor.execute("SELECT id FROM taxis WHERE estado = 1 LIMIT 1")
+    taxi = cursor.fetchone()
+
+    # Si se encuentra un taxi disponible, cambiar su estado a ocupado (0)
+    if taxi:
+        taxi_id = taxi[0]
+        cursor.execute("UPDATE taxis SET estado = 0 WHERE id = ?", (taxi_id,))
+        conexion.commit()  # Asegurar que los cambios se guarden en la base de datos
+        return taxi_id
+    else:
+        return None  # No hay taxis disponibles
 
 
 # Función para obtener las coordenadas iniciales del cliente
@@ -400,6 +488,24 @@ def obtener_pos_inicial_cliente(cliente_id):
             return None, None  # Manejo del error
     finally:
         conexion.close()  # Asegúrate de cerrar la conexión después de usarla
+
+
+
+# Función para obtener las coordenadas del destino desde la base de datos
+def obtener_destino_coords(conexion, destino):
+    query = "SELECT coordX, coordY FROM destinos WHERE destino = ?"
+    cursor = conexion.cursor()
+    cursor.execute(query, (destino,))
+    resultado = cursor.fetchone()
+
+    if resultado:
+        return resultado[0], resultado[1]  # Retornar coordX y coordY
+    else:
+        print(f"No se encontraron coordenadas para el destino {destino}")
+        return None
+
+
+
 
 
 
@@ -425,7 +531,6 @@ def actualizar_tablero(ax, destinos, clientes):
     plt.draw()
     plt.pause(0.01)
 
-# Función principal
 def iniciar_central(broker):
     signal.signal(signal.SIGINT, manejar_cierre)
     imprimir_tabla()
@@ -447,8 +552,13 @@ def iniciar_central(broker):
     destinos = obtener_destinos(conexion)
     actualizar_tablero(ax, destinos, [])
 
-    hilo_lector = threading.Thread(target=hilo_lector_mensajes, args=(broker, cola_mensajes, conexion))
+    # Iniciar hilo para escuchar mensajes de clientes
+    hilo_lector = threading.Thread(target=hilo_lector_cliente, args=(broker, cola_mensajes))
     hilo_lector.start()
+
+    # Iniciar hilo para escuchar coordenadas de los taxis
+    hilo_lector_taxis_thread = threading.Thread(target=hilo_lector_taxis, args=(broker,))
+    hilo_lector_taxis_thread.start()
 
     while central_activa:
         # Actualizar el tablero con todos los clientes en la lista global
@@ -458,7 +568,9 @@ def iniciar_central(broker):
         plt.pause(0.1)
 
     hilo_lector.join()
+    hilo_lector_taxis_thread.join()  # Asegurarse de que el hilo de taxis también finalice correctamente
     print("Central cerrada correctamente.")
+
 
 if __name__ == "__main__":
     broker = '127.0.0.1:9092'
