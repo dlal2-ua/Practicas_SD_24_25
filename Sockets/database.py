@@ -38,9 +38,7 @@ CREATE TABLE IF NOT EXISTS pos_inicial_cliente(
     coordY INTEGER NOT NULL
 )
 ''')
-
-
-               
+        
 cursor.execute('''
 CREATE TABLE IF NOT EXISTS destinos(
     destino CHAR PRIMARY KEY,
@@ -48,13 +46,13 @@ CREATE TABLE IF NOT EXISTS destinos(
     coordY INTEGER NOT NULL
 )
 ''')
-
+       
 
 
 
 #================================================================================================
 # INSERTS
-"""
+
 cursor.execute('''
     INSERT INTO pos_inicial_cliente (id, coordX, coordY) VALUES 
     ('a', 10, 10),
@@ -75,7 +73,7 @@ cursor.execute('''
     ('T', 18, 3)
 ''')
 
-"""
+
 
 
 cursor.execute('''

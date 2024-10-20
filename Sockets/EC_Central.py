@@ -415,6 +415,7 @@ def leer_coord(broker):
         print(f"Mensaje recibido: {msg}") 
         try:
             partes = msg.split(",")
+            partes = msg.split(",")
             taxi_id = int(partes[0])
             coordX_taxi = int(partes[1])  # Coordenada X
             coordY_taxi = int(partes[2])  # Coordenada Y
