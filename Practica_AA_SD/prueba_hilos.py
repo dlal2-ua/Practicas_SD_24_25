@@ -437,7 +437,7 @@ def procesar_coordenadas_taxi(taxi_id, coordX_taxi, coordY_taxi):
 
 
 
-
+###================== FUNCIONES DE BASE DE DATOS ==================###
 
 # Función para obtener destinos desde la base de datos
 def obtener_destinos(conexion):
@@ -505,8 +505,8 @@ def obtener_destino_coords(conexion, destino):
         return None
 
 
-
-
+###===========================================================================
+###===========================================================================
 
 
 # Función para crear y actualizar el tablero
@@ -530,6 +530,12 @@ def actualizar_tablero(ax, destinos, clientes):
 
     plt.draw()
     plt.pause(0.01)
+
+
+
+
+
+    
 
 def iniciar_central(broker):
     signal.signal(signal.SIGINT, manejar_cierre)

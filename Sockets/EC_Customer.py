@@ -1,5 +1,4 @@
 import time
-import threading
 from confluent_kafka import Producer, Consumer, KafkaException
 import sys # Se utiliza para acceder a parámetros y funciones específicas del sistema (en este caso, para acceder a los argumentos de la línea de comandos)
 import signal
@@ -14,6 +13,9 @@ Cómo funciona:
     Espera la confirmación de que la central recibió el mensaje de llegada.
     Se repite este ciclo para cada destino hasta que todos hayan sido procesados.
 """
+
+
+
 
 # Inicializar colorama (solo es necesario en Windows)
 init(autoreset=True)
@@ -53,7 +55,40 @@ def obtener_info_cliente(cliente_id, fichero):
         print(f"Error al procesar el fichero: {e}")
         return []
 
-# Función para enviar destino al tópico de Kafka y esperar confirmación
+# Función para verificar si la central está activa
+def verificar_central_activa(producer, consumer, cliente_id):
+    global salir_programa
+
+    mensaje_central_activa = "Central activa?"
+    while not salir_programa:
+        print(Fore.YELLOW + "Verificando si la central está activa...")
+        producer.produce('CLIENTES', key=cliente_id, value=mensaje_central_activa)
+        producer.flush()
+
+        tiempo_inicio = time.time()
+        while time.time() - tiempo_inicio < 5 and not salir_programa:
+            msg = consumer.poll(timeout=1.0)
+            if msg is None:
+                continue
+
+            if msg.error():
+                raise KafkaException(msg.error())
+
+            mensaje = msg.value().decode('utf-8')
+
+            if mensaje == "Central está operativa":
+                print(Fore.GREEN + "Central confirmada como operativa.")
+                print()
+                return True
+
+        print(Fore.RED + "No se recibió confirmación de la central en 5 segundos. Reintentando...\n")
+
+    return False
+
+
+
+
+# Función para enviar destino al tópico de Kafka y esperar confirmación de taxi asignado
 def enviar_destinos_kafka(broker, cliente_id, destinos_cliente):
     global salir_programa
 
@@ -71,18 +106,53 @@ def enviar_destinos_kafka(broker, cliente_id, destinos_cliente):
     topic_cliente = 'CENTRAL-CLIENTE'
     consumer.subscribe([topic_cliente])
 
+    # Verificar si la central está activa antes de proceder
+    if not verificar_central_activa(producer, consumer, cliente_id):
+        print(Fore.RED + "Error: No se pudo verificar si la central está operativa. Saliendo...")
+        return
+
     for i, destino in enumerate(destinos_cliente):
         if salir_programa:
             break
 
-        # Enviar el destino
-        mensaje_ir_destino = f"Cliente '{cliente_id}' quiere ir a {destino}"
-        print(mensaje_ir_destino)
-        print(f"Esperando confirmación de recogida...")
-        producer.produce('CLIENTES', key=cliente_id, value=mensaje_ir_destino)
-        producer.flush()
+        mensaje_enviado = False
 
-        # Esperar la confirmación de recogida (IN)
+        while not mensaje_enviado and not salir_programa:
+            # Enviar el destino
+            mensaje_ir_destino = f"Cliente '{cliente_id}' quiere ir a {destino}"
+            print(mensaje_ir_destino)
+            print(f"Esperando asignación de taxi...")
+
+            # Enviar mensaje al tópico 'CLIENTES'
+            producer.produce('CLIENTES', key=cliente_id, value=mensaje_ir_destino)
+            producer.flush()
+
+            # Esperar asignación de taxi (ASIGNADO)
+            tiempo_inicio = time.time()
+
+            while time.time() - tiempo_inicio < 110 and not salir_programa:
+                msg = consumer.poll(timeout=1.0)
+                if msg is None:
+                    continue
+
+                if msg.error():
+                    raise KafkaException(msg.error())
+
+                mensaje = msg.value().decode('utf-8')
+
+                if f"ID:{cliente_id} ASIGNADO" in mensaje:
+                    taxi_asignado = mensaje.split('TAXI:')[1]  # Extraer el taxi asignado
+                    print()
+                    print(Fore.GREEN + f"Confirmación recibida: Taxi {taxi_asignado} asignado")
+                    print(f"Esperando confirmación de recogida por el {taxi_asignado}...")
+                    mensaje_enviado = True
+                    break
+
+            if not mensaje_enviado:
+                print(Fore.YELLOW + "No se recibió confirmación en 10 segundos. Reintentando...\n")
+                time.sleep(20)
+
+        # Esperar confirmación de recogida (IN) o continuar si se recibió "KO"
         while not salir_programa:
             msg = consumer.poll(timeout=1.0)
             if msg is None:
@@ -92,31 +162,18 @@ def enviar_destinos_kafka(broker, cliente_id, destinos_cliente):
                 raise KafkaException(msg.error())
 
             mensaje = msg.value().decode('utf-8')
-            
-            # Manejar error si se recibe "KO"
-            if mensaje == f"ID:{cliente_id} KO":
-                print()
-                print(Fore.RED + f"Error: Fracaso en la recogida del cliente '{cliente_id}' para el destino {destino}.")
-                print(Fore.GREEN + f"Saliendo de este destino y continuando con el siguiente...")
-                print()
-                break
 
             if mensaje == f"ID:{cliente_id} IN":
+                print(Fore.GREEN + f"Confirmación recibida: Cliente recogido por {taxi_asignado}, yendo a {destino}")
                 print()
-                print(Fore.GREEN + f"Confirmación recibida: Cliente recogido, yendo a {destino}")
-                print("Esperando confirmación de llegada...")
                 break
 
-        # Si se ha recibido un "KO", pasar al siguiente destino
-        if mensaje == f"ID:{cliente_id} KO":
-            continue
+            if mensaje == f"ID:{cliente_id} KO":
+                print(Fore.RED + f"Error: Fracaso en la recogida del cliente '{cliente_id}' por {taxi_asignado}.")
+                print(Fore.GREEN + "Saliendo de este destino y continuando con el siguiente...\n")
+                break
 
-        # Enviar mensaje de llegada
-        mensaje_llegada = f"Cliente '{cliente_id}' ha llegado a {destino}"
-        producer.produce('CLIENTES', key=cliente_id, value=mensaje_llegada)
-        producer.flush()
-
-        # Esperar la confirmación de llegada (OK)
+        # Procesar confirmación de llegada (OK)
         while not salir_programa:
             msg = consumer.poll(timeout=1.0)
             if msg is None:
@@ -126,24 +183,16 @@ def enviar_destinos_kafka(broker, cliente_id, destinos_cliente):
                 raise KafkaException(msg.error())
 
             mensaje = msg.value().decode('utf-8')
-            
-            # Manejar error si se recibe "KO", tanto por si no hay taxis disponibles como si no se ha podido llegar al destino
-            if mensaje == f"ID:{cliente_id} KO":
-                print()
-                print(Fore.RED + f"Error: Fracaso en la llegada del cliente '{cliente_id}' a {destino}.")
-                print(Fore.GREEN + f"Saliendo de este destino y continuando con el siguiente...")
-                print()
-                break
 
             if mensaje == f"ID:{cliente_id} OK":
-                print()
                 print(Fore.GREEN + f"Confirmación recibida: Cliente llegó a {destino}")
                 print()
                 break
 
-        # Si se ha recibido un "KO", pasar al siguiente destino
-        if mensaje == f"ID:{cliente_id} KO":
-            continue
+            if mensaje == f"ID:{cliente_id} KO":
+                print(Fore.RED + f"Error: Fracaso en la llegada del cliente '{cliente_id}' a {destino}.")
+                print(Fore.GREEN + "Saliendo de este destino y continuando con el siguiente...\n")
+                break
 
         # Si no es el último destino, esperar 4 segundos antes de procesar el siguiente destino
         if i < len(destinos_cliente) - 1 and not salir_programa:
@@ -152,6 +201,20 @@ def enviar_destinos_kafka(broker, cliente_id, destinos_cliente):
             time.sleep(4)
 
     consumer.close()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 # Validar que la ID del cliente sea un único carácter en minúscula
@@ -179,4 +242,4 @@ if __name__ == "__main__":
 
     if not salir_programa:
         print(Fore.YELLOW + "Todos los destinos han sido procesados...")
-        print() 
+        print()
