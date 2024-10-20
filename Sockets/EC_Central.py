@@ -386,16 +386,16 @@ def iniciar_central(broker):
     print("Central cerrada correctamente.")
 
 
-if __name__ == "__main__":
-    broker = '127.0.0.1:9092'
-    iniciar_central(broker)
+
+    
+
 
 
 #=======================================================================================================================================================================
 #=======================================================================================================================================================================
 def leer_coord(broker):
     consumer = KafkaConsumer(
-        'TAXI',
+        'TAXIS',
         bootstrap_servers=broker,
         auto_offset_reset='earliest',  
         enable_auto_commit=True,  
@@ -416,7 +416,7 @@ def leer_coord(broker):
     consumer.close()
 
 def buscar_taxi_arg(msg):
-    conexion = sqlite3.connect('../database.db')
+    conexion = sqlite3.connect('database.db')
     query = f"Select id from taxis where id == {msg}"
     df_busqueda = pd.read_sql_query(query,conexion)
     if df_busqueda.empty:
@@ -449,6 +449,7 @@ if(len(sys.argv)==3):
     ip_broker = sys.argv[1]
     puerto_broker = sys.argv[2]
     broker = f'{ip_broker}:{puerto_broker}'
+    iniciar_central(broker)
     start(broker)
 else:
     print("Los argumentos introducidos no son los correctos.El formato es:<IP gestor de colas> <puerto del broker del gestor de colas>")
