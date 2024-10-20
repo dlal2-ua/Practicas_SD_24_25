@@ -15,7 +15,7 @@ def enviar_coord(broker):
         bootstrap_servers=broker,
     )
     id_taxi = sys.argv[5]
-    coordenada = id_taxi + ",6,5"
+    coordenada = id_taxi + ",20,20"
 
     print(f"Mensaje enviado: {coordenada}")
     producer.send('TAXIS', value=coordenada.encode('utf-8'))

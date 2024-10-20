@@ -57,9 +57,9 @@ cursor.execute('''
     INSERT INTO pos_inicial_cliente (id, coordX, coordY) VALUES 
     ('a', 10, 10),
     ('b', 20, 20),
-    ('c', 30, 30),
-    ('d', 40, 40),
-    ('e', 50, 50)
+    ('c', 15, 15),
+    ('d', 3, 3),
+    ('e', 6, 20)
 ''')
 
 

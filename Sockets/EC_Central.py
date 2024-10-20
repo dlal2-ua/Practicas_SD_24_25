@@ -181,7 +181,7 @@ def hilo_lector_cliente(broker, cola_mensajes):
 
 # Función para escuchar las coordenadas de los taxis y procesar si ha llegado al cliente o destino
 def hilo_lector_taxis(broker):
-    consumer = KafkaConsumer('CENTRAL-TAXI', bootstrap_servers=broker)
+    consumer = KafkaConsumer('TAXIS', bootstrap_servers=broker)
 
     while central_activa:
         for message in consumer:
@@ -191,25 +191,28 @@ def hilo_lector_taxis(broker):
 
             # Extraer el ID del taxi y sus coordenadas
             try:
-                partes = mensaje.split()
-                taxi_id = partes[1].strip("'")
-                coordX_taxi = float(partes[3].split(',')[0])  # Coordenada X
-                coordY_taxi = float(partes[3].split(',')[1])  # Coordenada Y
+                partes = mensaje.split(",")
+                taxi_id = int(partes[0])
+                coordX_taxi = int(partes[1])  # Coordenada X
+                coordY_taxi = int(partes[2])  # Coordenada Y
+
+                print(f"Taxi ID: {taxi_id}, Coordenadas: ({coordX_taxi}, {coordY_taxi})")
             except IndexError:
                 print(f"Error procesando el mensaje del taxi: {mensaje}")
                 continue
 
             # Verificar si el taxi está asignado a un cliente y comparar coordenadas
-            procesar_coordenadas_taxi(taxi_id, coordX_taxi, coordY_taxi)
+            procesar_coordenadas_taxi(taxi_id, coordX_taxi, coordY_taxi, broker)
 
 
 
 
 
 # Función para procesar las coordenadas del taxi y verificar si ha llegado al cliente o destino
-def procesar_coordenadas_taxi(taxi_id, coordX_taxi, coordY_taxi):
+def procesar_coordenadas_taxi(taxi_id, coordX_taxi, coordY_taxi, broker):
 
     producer = KafkaProducer(bootstrap_servers=broker)
+    conexion = conectar_bd()
 
     # Buscar si este taxi está asignado a algún cliente en el sistema
     for cliente in clientes_a_mostrar_global:
@@ -220,7 +223,8 @@ def procesar_coordenadas_taxi(taxi_id, coordX_taxi, coordY_taxi):
             print(f"Taxi {taxi_id} ha recogido al cliente {cliente_id}.")
             # Actualizar el estado del cliente en la tabla a 'EN TAXI'
             with lock:
-                tabla.loc[tabla['ID'] == cliente_id, 'ESTADO'] = 'EN TAXI'
+                tabla.loc[tabla['ID'] == cliente_id, 'ESTADO'] = f"EN TAXI {taxi_id}"
+                imprimir_tabla()
 
             # Enviar confirmación al cliente a través del tópico 'CENTRAL-CLIENTE'
             mensaje_confirmacion = f"ID:{cliente_id} IN"
@@ -229,7 +233,6 @@ def procesar_coordenadas_taxi(taxi_id, coordX_taxi, coordY_taxi):
             print(f"Confirmación enviada al cliente {cliente_id}: {mensaje_confirmacion}")
 
             # Enviar el destino al taxi
-            conexion = conectar_bd()
             destino_coords = obtener_destino_coords(conexion, destino)
             conexion.close()
 
@@ -246,6 +249,7 @@ def procesar_coordenadas_taxi(taxi_id, coordX_taxi, coordY_taxi):
             # Actualizar el estado del cliente a 'HA LLEGADO'
             with lock:
                 tabla.loc[tabla['ID'] == cliente_id, 'ESTADO'] = 'HA LLEGADO'
+                imprimir_tabla()
 
             # Enviar confirmación al cliente de que ha llegado al destino
             mensaje_confirmacion = f"ID:{cliente_id} OK"
@@ -402,6 +406,8 @@ def iniciar_central(broker):
 
 #=======================================================================================================================================================================
 #=======================================================================================================================================================================
+
+"""
 def leer_coord(broker):
     consumer = KafkaConsumer(
         'TAXIS',
@@ -415,7 +421,6 @@ def leer_coord(broker):
         print(f"Mensaje recibido: {msg}") 
         try:
             partes = msg.split(",")
-            partes = msg.split(",")
             taxi_id = int(partes[0])
             coordX_taxi = int(partes[1])  # Coordenada X
             coordY_taxi = int(partes[2])  # Coordenada Y
@@ -426,10 +431,12 @@ def leer_coord(broker):
             continue
         break
     consumer.close()
+"""
+
 
 def buscar_taxi_arg(msg):
     conexion = sqlite3.connect('database.db')
-    query = f"Select id from taxis where id == {msg}"
+    query = f"SELECT id FROM taxis WHERE id == {msg}"
     df_busqueda = pd.read_sql_query(query,conexion)
     if df_busqueda.empty:
         return False
@@ -441,7 +448,7 @@ def handle_client(conn, addr,broker):
     if buscar_taxi_arg(msg):
         print(f"El taxi con id {msg} está autentificado")
         conn.send("Taxi correctamente autentificado".encode(FORMAT))
-        leer_coord(broker)
+        #leer_coord(broker)
         #hilo_lector_taxis(broker)
     else:
         print(f"Se ha intentado conectar el taxi con id {msg} pero no está en la bbdd")
