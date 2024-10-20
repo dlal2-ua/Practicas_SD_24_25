@@ -9,6 +9,13 @@ import signal
 import sqlite3
 from funciones_generales import conectar_bd
 
+
+"""
+En Python, no se puede manejar señales (como SIGINT o SIGTERM) en hilos secundarios.
+puedes manejar las señales como SIGINT en el hilo principal y luego comunicar este evento a los 
+hilos secundarios mediante una variable compartida o una cola para que se detengan adecuadamente.
+"""
+
 HEADER = 64
 SERVER = socket.gethostbyname(socket.gethostname())
 PORT = 6060
@@ -45,11 +52,17 @@ clientes_a_mostrar_global = []
 # Variable para controlar si la central está activa
 central_activa = True
 
+server_active = True  # Variable global para controlar la actividad del servidor
+
+
+
 # Manejador de la señal SIGINT para cerrar la central limpiamente
 def manejar_cierre(signal, frame):
-    global central_activa
+    global central_activa, server_active
     print("\nSeñal de cierre recibida. Procesando mensajes pendientes...")
     central_activa = False
+    server_active = False
+
 
 # Función para imprimir la tabla de clientes solo si hay datos
 def imprimir_tabla():
@@ -345,8 +358,8 @@ def actualizar_tablero(ax, destinos, clientes):
 
     
 
+# Función para iniciar la central (debe ejecutarse en el hilo principal)
 def iniciar_central(broker):
-    signal.signal(signal.SIGINT, manejar_cierre)
     imprimir_tabla()
 
     fig, ax = plt.subplots(figsize=(8, 8))
@@ -374,17 +387,13 @@ def iniciar_central(broker):
     hilo_lector_taxis_thread = threading.Thread(target=hilo_lector_taxis, args=(broker,))
     hilo_lector_taxis_thread.start()
 
+    # Bucle principal de la interfaz gráfica (Matplotlib)
     while central_activa:
-        # Actualizar el tablero con todos los clientes en la lista global
         if clientes_a_mostrar_global:
             actualizar_tablero(ax, destinos, clientes_a_mostrar_global)
-
         plt.pause(0.1)
 
-    hilo_lector.join()
-    hilo_lector_taxis_thread.join()  # Asegurarse de que el hilo de taxis también finalice correctamente
     print("Central cerrada correctamente.")
-
 
 
     
@@ -405,10 +414,12 @@ def leer_coord(broker):
         msg = mensaje.value.decode('utf-8')  
         print(f"Mensaje recibido: {msg}") 
         try:
-            partes = mensaje.split(",")
+            partes = msg.split(",")
             taxi_id = int(partes[0])
             coordX_taxi = int(partes[1])  # Coordenada X
             coordY_taxi = int(partes[2])  # Coordenada Y
+
+            print(f"Taxi ID: {taxi_id}, Coordenadas: ({coordX_taxi}, {coordY_taxi})")
         except IndexError:
             print(f"Error procesando el mensaje del taxi: {mensaje}")
             continue
@@ -440,16 +451,36 @@ def start(broker):
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.bind(ADDR)
     server.listen()
-    while True:
+
+
+    while server_active:
         conn, addr = server.accept()
         handle_client(conn,addr,broker)
+    server.close()
+    print("Servidor cerrado correctamente.")
 
 
-if(len(sys.argv)==3):
-    ip_broker = sys.argv[1]
-    puerto_broker = sys.argv[2]
-    broker = f'{ip_broker}:{puerto_broker}'
-    iniciar_central(broker)
-    start(broker)
-else:
-    print("Los argumentos introducidos no son los correctos.El formato es:<IP gestor de colas> <puerto del broker del gestor de colas>")
+# Función principal unificada
+def main():
+    if len(sys.argv) == 3:
+        ip_broker = sys.argv[1]
+        puerto_broker = sys.argv[2]
+        broker = f'{ip_broker}:{puerto_broker}'
+
+        # Registrar la señal SIGINT para manejarla en el hilo principal
+        signal.signal(signal.SIGINT, manejar_cierre)
+
+        # Crear hilo para el servidor
+        hilo_servidor = threading.Thread(target=start, args=(broker,))
+        hilo_servidor.start()
+
+        # Iniciar la central en el hilo principal (para evitar el problema de Matplotlib)
+        iniciar_central(broker)
+
+        # Esperar a que el hilo del servidor termine
+        hilo_servidor.join()
+    else:
+        print("Los argumentos introducidos no son los correctos. El formato es: <IP gestor de colas> <puerto del broker del gestor de colas>")
+
+if __name__ == "__main__":
+    main()
