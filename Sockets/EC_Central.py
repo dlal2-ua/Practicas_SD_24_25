@@ -8,11 +8,12 @@ import pandas as pd
 import signal
 import sqlite3
 from funciones_generales import conectar_bd
-
+import numpy as np
+import matplotlib.pyplot as plt
 
 """
-En Python, no se puede manejar señales (como SIGINT o SIGTERM) en hilos secundarios.
-puedes manejar las señales como SIGINT en el hilo principal y luego comunicar este evento a los 
+En Python, no se puede manejr señales (como SIGINT o SIGTERM) en hilos secundarios.
+puedes manejar las señales comao SIGINT en el hilo principal y luego comunicar este evento a los 
 hilos secundarios mediante una variable compartida o una cola para que se detengan adecuadamente.
 """
 
@@ -26,9 +27,7 @@ FORMAT = 'utf-8'
 #=======================================================================================================================================================================
 #=======================================================================================================================================================================
 
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
+
 
 
 # Inicializar una tabla (DataFrame) con las columnas ID, DESTINO, ESTADO
@@ -187,7 +186,6 @@ def hilo_lector_taxis(broker):
         for message in consumer:
             # Decodificar el mensaje recibido del taxi
             mensaje = message.value.decode('utf-8')
-            print(f"Mensaje recibido del taxi: {mensaje}")
 
             # Extraer el ID del taxi y sus coordenadas
             try:
@@ -406,53 +404,35 @@ def iniciar_central(broker):
 
 #=======================================================================================================================================================================
 #=======================================================================================================================================================================
-
-"""
-def leer_coord(broker):
-    consumer = KafkaConsumer(
-        'TAXIS',
-        bootstrap_servers=broker,
-        auto_offset_reset='earliest',  
-        enable_auto_commit=True,  
-    )
-
-    for mensaje in consumer:
-        msg = mensaje.value.decode('utf-8')  
-        print(f"Mensaje recibido: {msg}") 
-        try:
-            partes = msg.split(",")
-            taxi_id = int(partes[0])
-            coordX_taxi = int(partes[1])  # Coordenada X
-            coordY_taxi = int(partes[2])  # Coordenada Y
-
-            print(f"Taxi ID: {taxi_id}, Coordenadas: ({coordX_taxi}, {coordY_taxi})")
-        except IndexError:
-            print(f"Error procesando el mensaje del taxi: {mensaje}")
-            continue
-        break
-    consumer.close()
-"""
-
+def autentificar_taxi(id_taxi):
+    conexion = conectar_bd()
+    cursor = conexion.cursor()
+    cursor.execute(f"UPDATE taxis SET estado = 1 WHERE id = {id_taxi}")
+    conexion.commit()
+    cursor.close()
+    conexion.close()
 
 def buscar_taxi_arg(msg):
-    conexion = sqlite3.connect('database.db')
-    query = f"SELECT id FROM taxis WHERE id == {msg}"
+    conexion = conectar_bd()
+    query = f"SELECT id FROM taxis WHERE id == {msg} AND estado IS NULL"
     df_busqueda = pd.read_sql_query(query,conexion)
     if df_busqueda.empty:
+        conexion.close()
         return False
     else:
+        conexion.close()
         return True
 
 def handle_client(conn, addr,broker):
     msg = conn.recv(1024).decode(FORMAT)
     if buscar_taxi_arg(msg):
+        autentificar_taxi(msg)
         print(f"El taxi con id {msg} está autentificado")
         conn.send("Taxi correctamente autentificado".encode(FORMAT))
-        #leer_coord(broker)
-        #hilo_lector_taxis(broker)
+
     else:
-        print(f"Se ha intentado conectar el taxi con id {msg} pero no está en la bbdd")
-        conn.send("Este taxi no está registrado en la bbdd".encode(FORMAT))
+        print(f"Se ha intentado conectar el taxi con id {msg} pero no ha sido posible")
+        conn.send("Este taxi no se puede registrar en la bbdd".encode(FORMAT))
     conn.close()
 
 def start(broker):

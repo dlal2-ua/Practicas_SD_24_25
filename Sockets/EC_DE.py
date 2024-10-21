@@ -3,33 +3,52 @@ import threading
 import time
 import sys
 from kafka import KafkaConsumer, KafkaProducer
-
+from funciones_generales import coordX_taxi,coordY_taxi,nueva_pos_taxi
 
 HEADER = 64
 SERVER = socket.gethostbyname(socket.gethostname())
 PORT = 5050
 FORMAT = 'utf-8'
 
-def enviar_coord(broker):
+def enviar_coord(broker,msg_sensor,parar_hilo_enviar_coord):
     producer = KafkaProducer(
         bootstrap_servers=broker,
     )
+    destinoX = 20
+    destinoY = 20
     id_taxi = sys.argv[5]
-    coordenada = id_taxi + ",20,20"
-
-    print(f"Mensaje enviado: {coordenada}")
-    producer.send('TAXIS', value=coordenada.encode('utf-8'))
-    producer.flush()
+    #print(coordX_taxi(id_taxi))
+    
+    while coordX_taxi(id_taxi) != destinoX and parar_hilo_enviar_coord==False:
+        if destinoX > coordX_taxi(id_taxi):
+            nuevaX = int(coordX_taxi(id_taxi)) + 1
+        else: 
+            nuevaX = int(coordX_taxi(id_taxi)) - 1
+        coordenada = str(id_taxi) + "," + str(nuevaX) + "," + str(coordY_taxi(id_taxi))
+        nueva_pos_taxi(id_taxi,nuevaX,coordY_taxi(id_taxi))
+        producer.send('TAXIS', value=coordenada.encode('utf-8'))
+        time.sleep(1)
+        while coordY_taxi(id_taxi) != destinoY:
+            if destinoY > coordY_taxi(id_taxi):
+                nuevaY = int(coordY_taxi(id_taxi)) + 1
+            else: 
+                nuevaY = int(coordY_taxi(id_taxi)) - 1
+            coordenada = str(id_taxi) + "," + str(coordX_taxi(id_taxi)) + "," + str(nuevaY)
+            nueva_pos_taxi(id_taxi,coordX_taxi(id_taxi),nuevaY)
+            producer.send('TAXIS', value=coordenada.encode('utf-8'))
+            time.sleep(1)
     producer.close()
 #Función cliente con la central
 def handle_server():
+    global autentificado
+    autentificado = False
     contador = 0
     while True:
         try:                
             client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             client.connect(ADDR_CLIENT)
-            msg = sys.argv[5]
-            message = msg.encode(FORMAT)
+            idTaxi = sys.argv[5]
+            message = idTaxi.encode(FORMAT)
             client.sendall(message)
             break
         except ConnectionRefusedError:
@@ -39,6 +58,8 @@ def handle_server():
                 time.sleep(1)
     respuesta = client.recv(2048).decode(FORMAT)
     print(respuesta)
+    if(respuesta == "Taxi correctamente autentificado"):
+        autentificado = True
 
 #Función para que el puerto aumente automáticamente cuando se ejecuta mas de 1 DE
 def servidor(broker):
@@ -58,19 +79,24 @@ def start(broker):
     server.bind(ADDR)
     print(f"Puerto en el que está escuchando: {PORT}")
     server.listen()
-
+    parar_hilo_enviar_coord = False
     while True:
         try:
             conn, addr = server.accept()
             handle_server()
-            enviar_coord(broker)
-            msg = conn.recv(1024).decode('utf-8')
-            while msg:
-                msg = conn.recv(1024).decode('utf-8')
-                print(msg)
-            conn.close()
+            if autentificado:
+                msg_sensor = conn.recv(1024).decode('utf-8')
+                hilo_enviar_coord = threading.Thread(target=enviar_coord, args=(broker,msg_sensor,parar_hilo_enviar_coord,))
+                hilo_enviar_coord.start()
+                while msg_sensor:
+                    msg_sensor = conn.recv(1024).decode('utf-8')
+                    print(msg_sensor)
+                conn.close()
+                hilo_enviar_coord.join()
+
         except ConnectionResetError:
             print("El sensor se ha perdido, esperando a que se conecte otro...")
+            parar_hilo_enviar_coord = True
 
 
 
