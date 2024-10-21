@@ -24,6 +24,8 @@ En relacion con la base de datos [BBDD]:
 ·El id del taxi (uniques)
 ·El Destino (char)
 ·El estado (booleano)
+    - Cuando el taxi está ocupado tomará el valor de 0
+    - Cuando el taxi está libre tomará el valor de 1
 ·La coordenada (int)
 
 
