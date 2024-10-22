@@ -130,7 +130,7 @@ def enviar_destinos_kafka(broker, cliente_id, destinos_cliente):
             # Esperar asignación de taxi (ASIGNADO)
             tiempo_inicio = time.time()
 
-            while time.time() - tiempo_inicio < 110 and not salir_programa:
+            while time.time() - tiempo_inicio < 50 and not salir_programa:
                 msg = consumer.poll(timeout=1.0)
                 if msg is None:
                     continue
@@ -150,7 +150,7 @@ def enviar_destinos_kafka(broker, cliente_id, destinos_cliente):
 
             if not mensaje_enviado:
                 print(Fore.YELLOW + "No se recibió confirmación en 10 segundos. Reintentando...\n")
-                time.sleep(20)
+                time.sleep(10)
 
         # Esperar confirmación de recogida (IN) o continuar si se recibió "KO"
         while not salir_programa:
