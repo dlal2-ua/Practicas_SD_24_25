@@ -123,6 +123,8 @@ def hilo_lector_cliente(broker, cola_mensajes):
             producer.send('CENTRAL-CLIENTE', key=cliente_id.encode('utf-8'), value=respuesta.encode('utf-8'))
             producer.flush()
             print(f"Respondido al cliente {cliente_id}: {respuesta}")
+            agregarCliente(conexion, cliente_id,destino, "EN ESPERA", 0, 0)
+
             continue  # Saltar al siguiente mensaje, no procesar destinos aún
 
         # Extraer el cliente y el destino del mensaje recibido
@@ -163,6 +165,7 @@ def hilo_lector_cliente(broker, cola_mensajes):
             if coordX_cliente is not None and coordY_cliente is not None:
                 mensaje_asignacion = f"ID:{cliente_id} ASIGNADO TAXI:{taxi_asignado} COORDENADAS:{coordX_cliente},{coordY_cliente} DESTINO:{destino}"
                 print(f"Taxi asignado: {taxi_asignado} al cliente {cliente_id} en coordenadas {coordX_cliente}, {coordY_cliente}")
+                agregarCoordCliente(conexion, cliente_id, coordX_cliente, coordY_cliente)
 
                 # Enviar el mensaje de asignación al taxi con las coordenadas del cliente y el destino
                 producer.send('CENTRAL-CLIENTE', key=cliente_id.encode('utf-8'), value=mensaje_asignacion.encode('utf-8'))
@@ -240,6 +243,7 @@ def procesar_coordenadas_taxi(taxi_id, coordX_taxi, coordY_taxi, broker):
         # Verificar si el taxi ha llegado a la posición del cliente
         if abs(coordX_taxi - coordX_cliente) < 0.1 and abs(coordY_taxi - coordY_cliente) < 0.1:
             print(f"Taxi {taxi_id} ha recogido al cliente {cliente_id}.")
+            cambiarEstadoCliente(conexion, cliente_id, f"EN TAXI {taxi_id}")
             # Actualizar el estado del cliente en la tabla a 'EN TAXI'
             with lock:
                 tabla.loc[tabla['ID'] == cliente_id, 'ESTADO'] = f"EN TAXI {taxi_id}"
@@ -265,6 +269,8 @@ def procesar_coordenadas_taxi(taxi_id, coordX_taxi, coordY_taxi, broker):
                 # Verificar si el taxi ha llegado al destino
                 if destino_coords and abs(coordX_taxi - coordX_destino) < 0.1 and abs(coordY_taxi - coordY_destino) < 0.1:
                     print(f"Taxi {taxi_id} ha llegado al destino del cliente {cliente_id}.")
+                    cambiarEstadoCliente(conexion, cliente_id, "HA LLEGADO")
+
                     # Actualizar el estado del cliente a 'HA LLEGADO'
                     with lock:
                         tabla.loc[tabla['ID'] == cliente_id, 'ESTADO'] = 'HA LLEGADO'
@@ -285,6 +291,41 @@ def procesar_coordenadas_taxi(taxi_id, coordX_taxi, coordY_taxi, broker):
 ###================== FUNCIONES DE BASE DE DATOS ==================###
 
 # Función para obtener destinos desde la base de datos
+
+def agregarCliente(conexion, id, destino, estado, coordX, coordY):
+    try:
+        cursor = conexion.cursor()
+        cursor.execute("INSERT INTO clientes (id, destino, estado, coordX, coordY) VALUES (?, ?, ?, ?, ?)", (id, destino, estado, coordX, coordY))
+        conexion.commit()
+    except sqlite3.Error as e:
+        print(f"Error al insertar cliente en la base de datos: {e}")
+    finally:
+        cursor.close()
+        conexion.close()
+
+def cambiarEstadoCliente(conexion, id, estado):
+    try:
+        cursor = conexion.cursor()
+        cursor.execute("UPDATE clientes SET estado = ? WHERE id = ?", (estado, id))
+        conexion.commit()
+    except sqlite3.Error as e:
+        print(f"Error al actualizar estado del cliente en la base de datos: {e}")
+    finally:
+        cursor.close()
+        conexion.close()
+
+def agregarCoordCliente(conexion, id, coordX, coordY):
+    try:
+        cursor = conexion.cursor()
+        cursor.execute("UPDATE clientes SET coordX = ?, coordY = ? WHERE id = ?", (coordX, coordY, id))
+        conexion.commit()
+    except sqlite3.Error as e:
+        print(f"Error al actualizar coordenadas del cliente en la base de datos: {e}")
+    finally:
+        cursor.close()
+        conexion.close()
+
+
 def obtener_destinos(conexion):
     query = "SELECT destino, coordX, coordY FROM destinos"
     df_destinos = pd.read_sql_query(query, conexion)
