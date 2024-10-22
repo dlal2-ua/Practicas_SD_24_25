@@ -17,7 +17,9 @@ CREATE TABLE IF NOT EXISTS taxis (
     destino_a_final CHAR NOT NULL,
     estado BOOLEAN ,
     coordX INTEGER NOT NULL,
-    coordY INTEGER NOT NULL
+    coordY INTEGER NOT NULL,
+    pasajero INTEGER NOT NULL
+
 )
 ''')
 

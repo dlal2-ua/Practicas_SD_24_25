@@ -210,15 +210,16 @@ def hilo_lector_taxis(broker):
         for message in consumer:
             # Decodificar el mensaje recibido del taxi
             mensaje = message.value.decode('utf-8')
-
+            
             # Extraer el ID del taxi y sus coordenadas
             try:
                 partes = mensaje.split(",")
                 taxi_id = int(partes[0])
                 coordX_taxi = int(partes[1])  # Coordenada X
                 coordY_taxi = int(partes[2])  # Coordenada Y
+                parado_taxi = partes[3]
 
-                print(f"Taxi ID: {taxi_id}, Coordenadas: ({coordX_taxi}, {coordY_taxi})")
+                print(f"Taxi ID: {taxi_id}, Coordenadas: ({coordX_taxi}, {coordY_taxi}) ,{parado_taxi}")
             except IndexError:
                 print(f"Error procesando el mensaje del taxi: {mensaje}")
                 continue
@@ -508,6 +509,7 @@ def start(broker):
         conn, addr = server.accept()
         handle_client(conn,addr,broker)
     server.close()
+    sys.exit()
     print("Servidor cerrado correctamente.")
 
 
