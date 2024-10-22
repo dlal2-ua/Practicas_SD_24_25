@@ -167,6 +167,10 @@ def hilo_lector_cliente(broker, cola_mensajes):
                 # Enviar el mensaje de asignación al taxi con las coordenadas del cliente y el destino
                 producer.send('CENTRAL-CLIENTE', key=cliente_id.encode('utf-8'), value=mensaje_asignacion.encode('utf-8'))
                 producer.flush()
+
+                # Iniciar un nuevo hilo para enviar las coordenadas del cliente al taxi
+                threading.Thread(target=hilo_enviar_coordenadas_taxi, args=(cliente_id, taxi_asignado, coordX_cliente, coordY_cliente, broker)).start()
+
             else:
                 print(f"No se encontraron coordenadas para el cliente {cliente_id}, no se puede asignar taxi.")
         else:
@@ -175,6 +179,23 @@ def hilo_lector_cliente(broker, cola_mensajes):
 
         # Simula un pequeño retraso entre mensajes
         time.sleep(1)
+
+
+
+# Función que envía las coordenadas del cliente al taxi por el tópico CENTRAL-TAXI
+def hilo_enviar_coordenadas_taxi(cliente_id, taxi_id, coordX_cliente, coordY_cliente, broker):
+    producer = KafkaProducer(bootstrap_servers=broker)
+
+    # Preparar el mensaje con las coordenadas del cliente
+    mensaje_coordenadas = f"{taxi_id},{coordX_cliente},{coordY_cliente},{cliente_id}"
+    
+    # Enviar mensaje al taxi a través del tópico 'CENTRAL-TAXI'
+    producer.send('CENTRAL-TAXI', key=str(taxi_id).encode('utf-8'), value=mensaje_coordenadas.encode('utf-8'))
+    producer.flush()
+    
+    print(f"Enviadas al taxi {taxi_id} las coordenadas de recogida del cliente {cliente_id}: ({coordX_cliente}, {coordY_cliente})")
+
+
 
 
 
@@ -237,29 +258,30 @@ def procesar_coordenadas_taxi(taxi_id, coordX_taxi, coordY_taxi, broker):
 
             if destino_coords:
                 coordX_destino, coordY_destino = destino_coords
-                mensaje_destino = f"ID:{cliente_id} DESTINO COORDENADAS:{coordX_destino},{coordY_destino}"
+                mensaje_destino = f"{taxi_id},{coordX_destino},{coordY_destino}, {cliente_id}"
                 producer.send('CENTRAL-CLIENTE', key=cliente_id.encode('utf-8'), value=mensaje_destino.encode('utf-8'))
                 producer.flush()
                 print(f"Enviado al taxi {taxi_id} las coordenadas del destino {destino}: {coordX_destino}, {coordY_destino}.")
 
-        # Verificar si el taxi ha llegado al destino
-        if destino_coords and abs(coordX_taxi - coordX_destino) < 0.1 and abs(coordY_taxi - coordY_destino) < 0.1:
-            print(f"Taxi {taxi_id} ha llegado al destino del cliente {cliente_id}.")
-            # Actualizar el estado del cliente a 'HA LLEGADO'
-            with lock:
-                tabla.loc[tabla['ID'] == cliente_id, 'ESTADO'] = 'HA LLEGADO'
-                imprimir_tabla()
+                # Verificar si el taxi ha llegado al destino
+                if destino_coords and abs(coordX_taxi - coordX_destino) < 0.1 and abs(coordY_taxi - coordY_destino) < 0.1:
+                    print(f"Taxi {taxi_id} ha llegado al destino del cliente {cliente_id}.")
+                    # Actualizar el estado del cliente a 'HA LLEGADO'
+                    with lock:
+                        tabla.loc[tabla['ID'] == cliente_id, 'ESTADO'] = 'HA LLEGADO'
+                        imprimir_tabla()
 
-            # Enviar confirmación al cliente de que ha llegado al destino
-            mensaje_confirmacion = f"ID:{cliente_id} OK"
-            producer.send('CENTRAL-CLIENTE', key=cliente_id.encode('utf-8'), value=mensaje_confirmacion.encode('utf-8'))
-            producer.flush()
-            print(f"Confirmación enviada al cliente {cliente_id}: {mensaje_confirmacion}")
+                    # Enviar confirmación al cliente de que ha llegado al destino
+                    mensaje_confirmacion = f"ID:{cliente_id} OK"
+                    producer.send('CENTRAL-CLIENTE', key=cliente_id.encode('utf-8'), value=mensaje_confirmacion.encode('utf-8'))
+                    producer.flush()
+                    print(f"Confirmación enviada al cliente {cliente_id}: {mensaje_confirmacion}")
 
-            # Liberar el taxi
-            liberar_taxi(conexion, taxi_id)
+                    # Liberar el taxi
+                    liberar_taxi(conexion, taxi_id)
 
-
+            else:
+                print(f"No se encontraron coordenadas para el destino {destino}")
 
 ###================== FUNCIONES DE BASE DE DATOS ==================###
 
