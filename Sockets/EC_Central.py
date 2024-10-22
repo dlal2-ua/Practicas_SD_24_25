@@ -187,7 +187,7 @@ def hilo_enviar_coordenadas_taxi(cliente_id, taxi_id, coordX_cliente, coordY_cli
     producer = KafkaProducer(bootstrap_servers=broker)
 
     # Preparar el mensaje con las coordenadas del cliente
-    mensaje_coordenadas = f"ID:{cliente_id} COORDENADAS RECOGIDA:{coordX_cliente},{coordY_cliente}"
+    mensaje_coordenadas = f"{taxi_id},{coordX_cliente},{coordY_cliente},{cliente_id}"
     
     # Enviar mensaje al taxi a través del tópico 'CENTRAL-TAXI'
     producer.send('CENTRAL-TAXI', key=str(taxi_id).encode('utf-8'), value=mensaje_coordenadas.encode('utf-8'))
@@ -257,7 +257,7 @@ def procesar_coordenadas_taxi(taxi_id, coordX_taxi, coordY_taxi, broker):
 
             if destino_coords:
                 coordX_destino, coordY_destino = destino_coords
-                mensaje_destino = f"{cliente_id}-{coordX_destino},{coordY_destino}"
+                mensaje_destino = f"{taxi_id},{coordX_destino},{coordY_destino}, {cliente_id}"
                 producer.send('CENTRAL-CLIENTE', key=cliente_id.encode('utf-8'), value=mensaje_destino.encode('utf-8'))
                 producer.flush()
                 print(f"Enviado al taxi {taxi_id} las coordenadas del destino {destino}: {coordX_destino}, {coordY_destino}.")
