@@ -144,6 +144,7 @@ def enviar_destinos_kafka(broker, cliente_id, destinos_cliente):
                     taxi_asignado = mensaje.split('TAXI:')[1]  # Extraer el taxi asignado
                     print()
                     print(Fore.GREEN + f"Confirmación recibida: Taxi {taxi_asignado} asignado")
+                    print()
                     print(f"Esperando confirmación de recogida por el {taxi_asignado}...")
                     mensaje_enviado = True
                     break
