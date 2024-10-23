@@ -27,7 +27,7 @@ cursor.execute('''
 CREATE TABLE IF NOT EXISTS clientes (
     id CHAR PRIMARY KEY,
     destino CHAR NOT NULL,
-    estado BOOLEAN,
+    estado STRING NOT NULL,
     coordX INTEGER NOT NULL,
     coordY INTEGER NOT NULL
 )
