@@ -18,7 +18,6 @@ def enviar_coord(broker,):
         bootstrap_servers=broker,
     )
 
-    print("HE LLEGAO AQUI")
     consumer= KafkaConsumer('CENTRAL-TAXI', bootstrap_servers=broker)
     id_taxi = sys.argv[5]
     for message in consumer:

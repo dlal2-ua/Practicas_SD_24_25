@@ -250,7 +250,6 @@ def procesar_coordenadas_taxi(taxi_id, coordX_taxi, coordY_taxi, broker):
     producer = KafkaProducer(bootstrap_servers=broker)
     conexion = conectar_bd()
 
-
     try:
         # Buscar si este taxi está asignado a algún cliente en el sistema
         for cliente in clientes_a_mostrar_global:
@@ -281,27 +280,36 @@ def procesar_coordenadas_taxi(taxi_id, coordX_taxi, coordY_taxi, broker):
                     producer.flush()
                     print(f"Enviado al taxi {taxi_id} las coordenadas del destino {destino}: {coordX_destino}, {coordY_destino}.")
 
-                    # Verificar si el taxi ha llegado al destino
-                    if destino_coords and abs(coordX_taxi - coordX_destino) < 0.1 and abs(coordY_taxi - coordY_destino) < 0.1:
-                        print(f"Taxi {taxi_id} ha llegado al destino del cliente {cliente_id}.")
-                        cambiarEstadoCliente(conexion, cliente_id, "HA LLEGADO")
-
-                        # Actualizar el estado del cliente a 'HA LLEGADO'
-                        with lock:
-                            tabla.loc[tabla['ID'] == cliente_id, 'ESTADO'] = 'HA LLEGADO'
-                            imprimir_tabla()
-
-                        # Enviar confirmación al cliente de que ha llegado al destino
-                        mensaje_confirmacion = f"ID:{cliente_id} OK"
-                        producer.send('CENTRAL-CLIENTE', key=cliente_id.encode('utf-8'), value=mensaje_confirmacion.encode('utf-8'))
-                        producer.flush()
-                        print(f"Confirmación enviada al cliente {cliente_id}: {mensaje_confirmacion}")
-
-                        # Liberar el taxi
-                        liberar_taxi(conexion, taxi_id)
-
                 else:
                     print(f"No se encontraron coordenadas para el destino {destino}")
+                
+                # Aquí terminamos el procesamiento inicial. Ahora solo esperamos más actualizaciones de coordenadas
+                return
+
+            # Verificar si el taxi ha llegado al destino (después de haber enviado las coordenadas del destino)
+            destino_coords = obtener_destino_coords(conexion, destino)
+            if destino_coords:
+                coordX_destino, coordY_destino = destino_coords
+
+                # Aquí es donde comprobamos si ha llegado al destino después de haber recogido al cliente
+                if abs(coordX_taxi - coordX_destino) < 0.1 and abs(coordY_taxi - coordY_destino) < 0.1:
+                    print(f"Taxi {taxi_id} ha llegado al destino del cliente {cliente_id}.")
+                    cambiarEstadoCliente(conexion, cliente_id, "HA LLEGADO")
+
+                    # Actualizar el estado del cliente a 'HA LLEGADO'
+                    with lock:
+                        tabla.loc[tabla['ID'] == cliente_id, 'ESTADO'] = 'HA LLEGADO'
+                        imprimir_tabla()
+
+                    # Enviar confirmación al cliente de que ha llegado al destino
+                    mensaje_confirmacion = f"ID:{cliente_id} OK"
+                    producer.send('CENTRAL-CLIENTE', key=cliente_id.encode('utf-8'), value=mensaje_confirmacion.encode('utf-8'))
+                    producer.flush()
+                    print(f"Confirmación enviada al cliente {cliente_id}: {mensaje_confirmacion}")
+
+                    # Liberar el taxi
+                    liberar_taxi(conexion, taxi_id)
+
     finally:
         conexion.close()
 
