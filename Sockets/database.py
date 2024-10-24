@@ -80,11 +80,11 @@ cursor.execute('''
 
 cursor.execute('''
     INSERT INTO taxis (id, destino_a_cliente, destino_a_final, estado, coordX, coordY,pasajero) VALUES
-    (1, 'a', 'N', NULL, 1, 1, NULL),
-    (2, 'b', 'X', NULL, 1, 1, NULL),
+    (1, 'a', 'N', NULL, 1, 1 , NULL),
+    (2, 'b', 'X', NULL, 1, 1 , NULL),
     (3, 'c', 'U', NULL, 1, 1, NULL),
-    (4, 'd', 'L', NULL, 1, 1, NULL),
-    (5, 'e', 'T', NULL, 1, 1, NULL)
+    (4, 'd', 'L', NULL, 1, 1,NULL),
+    (5, 'e', 'T', NULL, 1, 1 ,NULL)
 ''')
 
 
