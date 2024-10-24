@@ -42,7 +42,7 @@ def sacar_taxi(id_taxi):
 def pasajero_dentro(id_taxi,pasajero):
     conexion = conectar_bd()
     cursor = conexion.cursor()
-    cursor.execute(f"UPDATE taxis SET pasajero = {pasajero} WHERE id = {id_taxi}")
+    cursor.execute(f"UPDATE taxis SET pasajero = {pasajero} WHERE id == {id_taxi}")
     conexion.commit()
     cursor.close()
     conexion.close()
