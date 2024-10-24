@@ -50,3 +50,7 @@ pip install git+https://github.com/dpkp/kafka-python.git
 
 bin\windows\kafka-topics.bat --create --topic SD --bootstrap-server localhost:9092
 bin\windows\kafka-topics.bat --list --bootstrap-server localhost:9092
+
+
+s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
