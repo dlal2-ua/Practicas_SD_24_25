@@ -54,3 +54,15 @@ bin\windows\kafka-topics.bat --list --bootstrap-server localhost:9092
 
 s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
+
+def get_local_ip():
+    interfaces = netifaces.interfaces()
+    for interface in interfaces:
+        addresses = netifaces.ifaddresses(interface)
+        if netifaces.AF_INET in addresses:
+            ip_info = addresses[netifaces.AF_INET][0]
+            ip_address = ip_info['addr']
+            if not ip_address.startswith("127."):  # Ignorar la dirección loopback
+                return ip_address
+    return "No se encontró una dirección IP válida.
+
