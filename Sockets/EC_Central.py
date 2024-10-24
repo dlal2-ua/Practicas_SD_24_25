@@ -10,6 +10,7 @@ import sqlite3
 from funciones_generales import conectar_bd
 import numpy as np
 import matplotlib.pyplot as plt
+from queue import Queue
 
 """
 En Python, no se puede manejr señales (como SIGINT o SIGTERM) en hilos secundarios.
@@ -60,7 +61,8 @@ central_activa = True
 
 server_active = True  # Variable global para controlar la actividad del servidor
 
-
+# Crear colas para la comunicación entre hilos
+cola_taxis = Queue()
 
 # Manejador de la señal SIGINT para cerrar la central limpiamente
 def manejar_cierre(signal, frame):
@@ -142,8 +144,9 @@ def hilo_lector_cliente(broker, cola_mensajes):
                 cliente_id = partes[1].strip("'")  # Extraer ID del cliente sin las comillas
                 destino = partes[-1]  # El último valor es el destino
 
-                # Abre la conexión a la base de datos para agregar el cliente
-                agregarCliente(conexion, cliente_id, destino, "EN ESPERA", 1, 1)
+                if (buscarCliente(conexion, cliente_id) == False):
+                    # Abre la conexión a la base de datos para agregar el cliente
+                    agregarCliente(conexion, cliente_id, destino, "EN ESPERA", 0, 0)
 
             except IndexError:
                 print(f"Error procesando el mensaje: {mensaje}")
@@ -216,43 +219,40 @@ def hilo_enviar_coordenadas_taxi(cliente_id, taxi_id, coordX_cliente, coordY_cli
 
 
 
+
 # Función para escuchar las coordenadas de los taxis y procesar si ha llegado al cliente o destino
 def hilo_lector_taxis(broker):
     consumer = KafkaConsumer('TAXIS', bootstrap_servers=broker)
-
+    
     while central_activa:
         for message in consumer:
-            # Decodificar el mensaje recibido del taxi
             mensaje = message.value.decode('utf-8')
-
-            # Extraer el ID del taxi y sus coordenadas
             try:
                 partes = mensaje.split(",")
                 taxi_id = int(partes[0])
-                coordX_taxi = int(partes[1])  # Coordenada X
-                coordY_taxi = int(partes[2])  # Coordenada Y
-
+                coordX_taxi = int(partes[1])
+                coordY_taxi = int(partes[2])
                 print(f"Taxi ID: {taxi_id}, Coordenadas: ({coordX_taxi}, {coordY_taxi})")
+
+                # Pasar las coordenadas procesadas al hilo principal mediante la cola
+                cola_taxis.put((taxi_id, coordX_taxi, coordY_taxi))
+
             except IndexError:
                 print(f"Error procesando el mensaje del taxi: {mensaje}")
                 continue
 
-            # Verificar si el taxi está asignado a un cliente y comparar coordenadas
-            procesar_coordenadas_taxi(taxi_id, coordX_taxi, coordY_taxi, broker)
 
 
 
-
-
-# Función para procesar las coordenadas del taxi y verificar si ha llegado al cliente o destino
+clientes_en_taxi_global = []  # Clientes ya recogidos y en trayecto
 def procesar_coordenadas_taxi(taxi_id, coordX_taxi, coordY_taxi, broker):
-
-    producer = KafkaProducer(bootstrap_servers=broker)
     conexion = conectar_bd()
-
+    producer = KafkaProducer(bootstrap_servers=broker)
 
     try:
-        # Buscar si este taxi está asignado a algún cliente en el sistema
+        taxis_en_tablero = []
+
+        # Procesar clientes que están esperando ser recogidos por un taxi
         for cliente in clientes_a_mostrar_global:
             cliente_id, destino, (coordX_cliente, coordY_cliente) = cliente
 
@@ -260,54 +260,88 @@ def procesar_coordenadas_taxi(taxi_id, coordX_taxi, coordY_taxi, broker):
             if abs(coordX_taxi - coordX_cliente) < 0.1 and abs(coordY_taxi - coordY_cliente) < 0.1:
                 print(f"Taxi {taxi_id} ha recogido al cliente {cliente_id}.")
                 cambiarEstadoCliente(conexion, cliente_id, f"EN TAXI {taxi_id}")
-                # Actualizar el estado del cliente en la tabla a 'EN TAXI'
+
                 with lock:
                     tabla.loc[tabla['ID'] == cliente_id, 'ESTADO'] = f"EN TAXI {taxi_id}"
                     imprimir_tabla()
 
-                # Enviar confirmación al cliente a través del tópico 'CENTRAL-CLIENTE'
+                # Mover al cliente de la lista de clientes esperando a la lista de clientes en taxi
+                clientes_a_mostrar_global.remove(cliente)
+                clientes_en_taxi_global.append((cliente_id, destino, taxi_id))
+
+                # Actualizar la lista de taxis en el tablero
+                taxis_en_tablero.append((taxi_id, coordX_taxi, coordY_taxi, 0, cliente_id))
+
+                # Enviar confirmación al cliente
                 mensaje_confirmacion = f"ID:{cliente_id} IN"
                 producer.send('CENTRAL-CLIENTE', key=cliente_id.encode('utf-8'), value=mensaje_confirmacion.encode('utf-8'))
                 producer.flush()
                 print(f"Confirmación enviada al cliente {cliente_id}: {mensaje_confirmacion}")
 
-                # Enviar el destino al taxi
+                # Obtener coordenadas del destino y enviarlas al taxi
                 destino_coords = obtener_destino_coords(conexion, destino)
-
                 if destino_coords:
                     coordX_destino, coordY_destino = destino_coords
                     mensaje_destino = f"{taxi_id},{coordX_destino},{coordY_destino},{cliente_id}"
                     producer.send('CENTRAL-TAXI', key=cliente_id.encode('utf-8'), value=mensaje_destino.encode('utf-8'))
                     producer.flush()
                     print(f"Enviado al taxi {taxi_id} las coordenadas del destino {destino}: {coordX_destino}, {coordY_destino}.")
+            else:
+                # Si no se ha recogido a un cliente, actualizar el taxi como en movimiento
+                taxis_en_tablero.append((taxi_id, coordX_taxi, coordY_taxi, 1, None))
 
-                    # Verificar si el taxi ha llegado al destino
-                    if destino_coords and abs(coordX_taxi - coordX_destino) < 0.1 and abs(coordY_taxi - coordY_destino) < 0.1:
-                        print(f"Taxi {taxi_id} ha llegado al destino del cliente {cliente_id}.")
-                        cambiarEstadoCliente(conexion, cliente_id, "HA LLEGADO")
+        # Procesar clientes que están en trayecto en el taxi
+        for cliente_id, destino, taxi_asignado in clientes_en_taxi_global:
+            destino_coords = obtener_destino_coords(conexion, destino)
+            if destino_coords:
+                coordX_destino, coordY_destino = destino_coords
+                # Verificar si el taxi ha llegado al destino del cliente
+                if abs(coordX_taxi - coordX_destino) < 0.1 and abs(coordY_taxi - coordY_destino) < 0.1 and taxi_asignado == taxi_id:
+                    print(f"Taxi {taxi_id} ha llegado al destino del cliente {cliente_id}.")
+                    cambiarEstadoCliente(conexion, cliente_id, "HA LLEGADO")
+                    cambiarPosInicialCliente(conexion, cliente_id, coordX_destino, coordY_destino)
 
-                        # Actualizar el estado del cliente a 'HA LLEGADO'
-                        with lock:
-                            tabla.loc[tabla['ID'] == cliente_id, 'ESTADO'] = 'HA LLEGADO'
-                            imprimir_tabla()
+                    with lock:
+                        tabla.loc[tabla['ID'] == cliente_id, 'ESTADO'] = 'HA LLEGADO'
+                    imprimir_tabla()
 
-                        # Enviar confirmación al cliente de que ha llegado al destino
-                        mensaje_confirmacion = f"ID:{cliente_id} OK"
-                        producer.send('CENTRAL-CLIENTE', key=cliente_id.encode('utf-8'), value=mensaje_confirmacion.encode('utf-8'))
-                        producer.flush()
-                        print(f"Confirmación enviada al cliente {cliente_id}: {mensaje_confirmacion}")
+                    # Enviar confirmación de llegada al cliente
+                    mensaje_confirmacion = f"ID:{cliente_id} OK"
+                    producer.send('CENTRAL-CLIENTE', key=cliente_id.encode('utf-8'), value=mensaje_confirmacion.encode('utf-8'))
+                    producer.flush()
+                    print(f"Confirmación enviada al cliente {cliente_id}: {mensaje_confirmacion}")
 
-                        # Liberar el taxi
-                        liberar_taxi(conexion, taxi_id)
+                    # Liberar el taxi
+                    liberar_taxi(conexion, taxi_id)
 
+                    # Eliminar al cliente de la lista de clientes en trayecto
+                    clientes_en_taxi_global.remove((cliente_id, destino, taxi_asignado))
+
+                    # Actualizar la lista de taxis en el tablero (sin cliente)
+                    taxis_en_tablero = [(tid, x, y, 1, None) if tid == taxi_id else (tid, x, y, cid) for tid, x, y, cid in taxis_en_tablero]
                 else:
-                    print(f"No se encontraron coordenadas para el destino {destino}")
+                    # Mantener al cliente en el taxi durante el trayecto
+                    taxis_en_tablero.append((taxi_id, coordX_taxi, coordY_taxi, 0, cliente_id))
+
     finally:
         conexion.close()
+
+    return taxis_en_tablero
+
+
+
 
 ###================== FUNCIONES DE BASE DE DATOS ==================###
 
 # Función para obtener destinos desde la base de datos
+
+def cambiarPosInicialCliente(conexion, id, coordX, coordY):
+    try:
+        cursor = conexion.cursor()
+        cursor.execute("UPDATE pos_inicial_cliente SET coordX = ?, coordY = ? WHERE id = ?", (coordX, coordY, id))
+        conexion.commit()
+    except sqlite3.Error as e:
+        print(f"Error al actualizar coordenadas iniciales del cliente en la base de datos: {e}")
 
 def agregarCliente(conexion, id, destino, estado, coordX, coordY):
     try:
@@ -316,6 +350,15 @@ def agregarCliente(conexion, id, destino, estado, coordX, coordY):
         conexion.commit()
     except sqlite3.Error as e:
         print(f"Error al insertar cliente en la base de datos: {e}")
+
+def buscarCliente(conexion, id):
+    try:
+        cursor = conexion.cursor()
+        cursor.execute("SELECT * FROM clientes WHERE id = ?", (id,))
+        return cursor.fetchone() is not None
+    except sqlite3.Error as e:
+        print(f"Error al buscar cliente en la base de datos: {e}")
+        return False
 
 
 
@@ -401,47 +444,92 @@ def obtener_destino_coords(conexion, destino):
     else:
         print(f"No se encontraron coordenadas para el destino {destino}")
         return None
+    
+def obtener_taxis(conexion):
+   
+    cursor = conexion.cursor()
+    query = """
+        SELECT id, coordX, coordY, estado
+        FROM taxis;
+    """
+    cursor.execute(query)
+    taxis = cursor.fetchall()
+    return taxis  # Retorna una lista de tuplas: (taxi_id, coordX, coordY, estado)
 
 
 ###===========================================================================
 ###===========================================================================
 
+def procesar_taxis(conexion, clientes):
 
-# Función para crear y actualizar el tablero
-def actualizar_tablero(ax, destinos, clientes):
-    # Eliminar parches anteriores
-    for patch in ax.patches:
+    taxis_en_tablero = []
+    taxis = obtener_taxis(conexion)
+
+    for taxi_id, coordX_taxi, coordY_taxi, estado in taxis:
+        cliente_en_taxi = None
+
+        # Verificar si el taxi ha llegado a la posición de algún cliente
+        for cliente_id, destino, (coordX_cliente, coordY_cliente) in clientes:
+            if abs(coordX_taxi - coordX_cliente) < 0.1 and abs(coordY_taxi - coordY_cliente) < 0.1:
+                cliente_en_taxi = cliente_id
+                clientes_a_mostrar_global.remove((cliente_id, destino, (coordX_cliente, coordY_cliente)))  # Remover cliente de la lista
+                print(f"Taxi {taxi_id} ha recogido al cliente {cliente_id}.")  # Imprimir mensaje de recogida
+                break  # Salir del bucle si se ha recogido a un cliente
+
+        # Añadir taxi al tablero con el cliente si lo ha recogido
+        taxis_en_tablero.append((taxi_id, coordX_taxi, coordY_taxi, estado, cliente_en_taxi))
+
+        # Imprimir el cliente en taxi (puede ser None si no hay cliente)
+        if cliente_en_taxi:
+            print(f"Cliente en taxi: {cliente_en_taxi}")
+        else:
+            print("No hay cliente en taxi.")
+
+    return taxis_en_tablero
+
+
+
+
+# Función para actualizar el tablero (solo en el hilo principal)
+def actualizar_tablero(ax, destinos, clientes, taxis):
+    """Actualiza el tablero con las posiciones actuales."""
+    # Limpiar el tablero de elementos anteriores (patches y texts)
+    
+    # Eliminar patches (rectángulos, que representan destinos y taxis)
+    for patch in ax.patches[:]:
         patch.remove()
 
-    for txt in ax.texts:
+    # Eliminar textos (que muestran IDs y coordenadas)
+    for txt in ax.texts[:]:
         txt.remove()
 
-    # Agregar destinos al tablero (que son estáticos)
     for label, (x, y) in destinos.items():
         ax.add_patch(plt.Rectangle((x - 1, y - 1), 1, 1, color="deepskyblue"))
         ax.text(x - 0.5, y - 0.5, label, va='center', ha='center', fontsize=10, color="black")
 
-    # Agregar clientes en su posición inicial
     for cliente_id, destino, (coordX, coordY) in clientes:
         ax.add_patch(plt.Rectangle((coordX - 1, coordY - 1), 1, 1, color="yellow"))
         ax.text(coordX - 0.5, coordY - 0.5, cliente_id, fontsize=10, ha='center', va='center', color='black')
+
+    for taxi_id, coordX_taxi, coordY_taxi, estado, cliente_en_taxi in taxis:
+        color_taxi = "green" if estado == 0 else "red"  # Verde si está en movimiento, rojo si está estacionado
+        ax.add_patch(plt.Rectangle((coordX_taxi - 1, coordY_taxi - 1), 1, 1, color=color_taxi))
+        if cliente_en_taxi:
+            ax.text(coordX_taxi - 0.5, coordY_taxi - 0.5, f"{taxi_id}-{cliente_en_taxi}", fontsize=8, ha='center', va='center', color='black')
+        else:
+            ax.text(coordX_taxi - 0.5, coordY_taxi - 0.5, f"{taxi_id}", fontsize=10, ha='center', va='center', color='black')
 
     plt.draw()
     plt.pause(0.01)
 
 
 
-
-
-    
-
-# Función para iniciar la central (debe ejecutarse en el hilo principal)
 def iniciar_central(broker):
     imprimir_tabla()
 
     fig, ax = plt.subplots(figsize=(8, 8))
-    grid_size = 20
 
+    grid_size = 20
     ax.set_xlim(0.1, grid_size)
     ax.set_ylim(0.1, grid_size)
     ax.set_xticks(np.arange(1, grid_size + 1))
@@ -454,7 +542,7 @@ def iniciar_central(broker):
 
     conexion = conectar_bd()
     destinos = obtener_destinos(conexion)
-    actualizar_tablero(ax, destinos, [])
+    actualizar_tablero(ax, destinos, [], [])  # Inicialmente, sin clientes ni taxis
 
     # Iniciar hilo para escuchar mensajes de clientes
     hilo_lector = threading.Thread(target=hilo_lector_cliente, args=(broker, cola_mensajes))
@@ -465,14 +553,29 @@ def iniciar_central(broker):
     hilo_lector_taxis_thread.start()
 
     # Bucle principal de la interfaz gráfica (Matplotlib)
-    while central_activa:
-        if clientes_a_mostrar_global:
-            actualizar_tablero(ax, destinos, clientes_a_mostrar_global)
-        plt.pause(0.1)
+    try:
+        while central_activa:
+            # Procesar mensajes en la cola (coordenadas de taxis)
+            while not cola_taxis.empty():
+                taxi_id, coordX_taxi, coordY_taxi = cola_taxis.get()
+                
+                # Procesar las coordenadas del taxi y obtener taxis en el tablero
+                taxis_en_tablero = procesar_coordenadas_taxi(taxi_id, coordX_taxi, coordY_taxi, broker)
 
-    print("Central cerrada correctamente.")
+                # Actualizar el tablero con los taxis procesados
+                #taxis_en_tablero = procesar_taxis(conexion, clientes_a_mostrar_global)
+                actualizar_tablero(ax, destinos, clientes_a_mostrar_global, taxis_en_tablero)
 
-
+            plt.pause(0.1)  # Permitir actualizaciones de la GUI
+    except Exception as e:
+        print(f"Ocurrió un error: {e}")
+    finally:
+        print("Cerrando hilos...")
+        # Aquí podrías tener lógica para cerrar los hilos de manera ordenada si es necesario
+        hilo_lector.join()  # Esperar a que termine el hilo del lector
+        hilo_lector_taxis_thread.join()  # Esperar a que termine el hilo de taxis
+        conexion.close()  # Cerrar la conexión a la base de datos
+        print("Central cerrada correctamente.")
     
 
 

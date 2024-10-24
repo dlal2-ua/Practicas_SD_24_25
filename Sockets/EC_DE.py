@@ -17,6 +17,7 @@ def enviar_coord(broker,):
     producer = KafkaProducer(
         bootstrap_servers=broker,
     )
+
     consumer= KafkaConsumer('CENTRAL-TAXI', bootstrap_servers=broker)
     id_taxi = sys.argv[5]
     for message in consumer:
@@ -31,35 +32,43 @@ def enviar_coord(broker,):
                 destinoX = int(partes[1])  
                 destinoY = int(partes[2])
                 pasajero = partes[3]
-                #pasajero_dentro(taxi,pasajero)
-                while coordX_taxi(id_taxi) != destinoX and parar_hilo_enviar_coord==False:
-                    if msg_sensor == "OK":
-                        if destinoX > coordX_taxi(id_taxi):
-                            nuevaX = int(coordX_taxi(id_taxi)) + 1
-                        else: 
-                            nuevaX = int(coordX_taxi(id_taxi)) - 1
-                        coordenada = str(id_taxi) + "," + str(nuevaX) + "," + str(coordY_taxi(id_taxi)) + "," + str(msg_sensor)
-                        nueva_pos_taxi(id_taxi,nuevaX,coordY_taxi(id_taxi))
-                        producer.send('TAXIS', value=coordenada.encode('utf-8'))
-                        time.sleep(1)
-                        while coordY_taxi(id_taxi) != destinoY and parar_hilo_enviar_coord == False:
-                            if msg_sensor == "OK":
-                                if destinoY > coordY_taxi(id_taxi):
-                                    nuevaY = int(coordY_taxi(id_taxi)) + 1
-                                else: 
-                                    nuevaY = int(coordY_taxi(id_taxi)) - 1
-                                coordenada = str(id_taxi) + "," + str(coordX_taxi(id_taxi)) + "," + str(nuevaY) + "," + str(msg_sensor)
-                                nueva_pos_taxi(id_taxi,coordX_taxi(id_taxi),nuevaY)
-                                producer.send('TAXIS', value=coordenada.encode('utf-8'))
-                                time.sleep(1)
-                            else:
-                                coordenada = str(id_taxi) + "," + str(coordX_taxi(id_taxi)) + "," + str(coordY_taxi(id_taxi)) + "," + str(msg_sensor)
-                                producer.send('TAXIS', value=coordenada.encode('utf-8'))
-                                time.sleep(1)
-                    else:
-                        coordenada = str(id_taxi) + "," + str(coordX_taxi(id_taxi)) + "," + str(coordY_taxi(id_taxi)) + "," + str(msg_sensor)
-                        producer.send('TAXIS', value=coordenada.encode('utf-8'))
-                        time.sleep(1)
+
+                # Una vez que ha llegado, puedes manejar la lógica adicional aquí (ej: recoger el pasajero)
+                if coordX_taxi(id_taxi) == destinoX and coordY_taxi(id_taxi) == destinoY:
+                    print(f"Taxi {id_taxi} ha llegado al destino y ha recogido al pasajero {pasajero}.")
+                    coordenada = str(id_taxi) + "," + str(coordX_taxi(id_taxi)) + "," + str(coordY_taxi(id_taxi)) + "," + str(msg_sensor)
+                    producer.send('TAXIS', value=coordenada.encode('utf-8'))
+                    time.sleep(1)
+                else:
+                    #pasajero_dentro(taxi,pasajero)
+                    while coordX_taxi(id_taxi) != destinoX and parar_hilo_enviar_coord==False:
+                        if msg_sensor == "OK":
+                            if destinoX > coordX_taxi(id_taxi):
+                                nuevaX = int(coordX_taxi(id_taxi)) + 1
+                            else: 
+                                nuevaX = int(coordX_taxi(id_taxi)) - 1
+                            coordenada = str(id_taxi) + "," + str(nuevaX) + "," + str(coordY_taxi(id_taxi)) + "," + str(msg_sensor)
+                            nueva_pos_taxi(id_taxi,nuevaX,coordY_taxi(id_taxi))
+                            producer.send('TAXIS', value=coordenada.encode('utf-8'))
+                            time.sleep(1)
+                            while coordY_taxi(id_taxi) != destinoY and parar_hilo_enviar_coord == False:
+                                if msg_sensor == "OK":
+                                    if destinoY > coordY_taxi(id_taxi):
+                                        nuevaY = int(coordY_taxi(id_taxi)) + 1
+                                    else: 
+                                        nuevaY = int(coordY_taxi(id_taxi)) - 1
+                                    coordenada = str(id_taxi) + "," + str(coordX_taxi(id_taxi)) + "," + str(nuevaY) + "," + str(msg_sensor)
+                                    nueva_pos_taxi(id_taxi,coordX_taxi(id_taxi),nuevaY)
+                                    producer.send('TAXIS', value=coordenada.encode('utf-8'))
+                                    time.sleep(1)
+                                else:
+                                    coordenada = str(id_taxi) + "," + str(coordX_taxi(id_taxi)) + "," + str(coordY_taxi(id_taxi)) + "," + str(msg_sensor)
+                                    producer.send('TAXIS', value=coordenada.encode('utf-8'))
+                                    time.sleep(1)
+                        else:
+                            coordenada = str(id_taxi) + "," + str(coordX_taxi(id_taxi)) + "," + str(coordY_taxi(id_taxi)) + "," + str(msg_sensor)
+                            producer.send('TAXIS', value=coordenada.encode('utf-8'))
+                            time.sleep(1)
         except IndexError:
             print(f"Error procesando el mensaje del taxi: {mensaje}")
             continue
