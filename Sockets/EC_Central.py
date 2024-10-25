@@ -629,7 +629,7 @@ def handle_client(conn, addr,broker):
 
 def start(broker):
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    #SERVER = obtener_ip()
+    #SERVER = obtener_ip()+
     SERVER = socket.gethostbyname(socket.gethostname())
     ADDR=(SERVER,PORT)
     server.bind(ADDR)
