@@ -3,7 +3,7 @@ import threading
 import time
 import sys
 from kafka import KafkaConsumer, KafkaProducer
-from funciones_generales import coordX_taxi,coordY_taxi,nueva_pos_taxi,pasajero_dentro
+from funciones_generales import coordX_taxi,coordY_taxi,nueva_pos_taxi,pasajero_dentro,sacar_taxi
 
 HEADER = 64
 SERVER = socket.gethostbyname(socket.gethostname())
@@ -146,14 +146,17 @@ def start(broker):
 #MAIN
 
 if (len(sys.argv)==6):
-    SERVER_CLIENT = sys.argv[1]
-    PORT_CLIENT = int(sys.argv[2])
-    ip_broker = sys.argv[3]
-    puerto_broker = sys.argv[4]
-    broker = f'{ip_broker}:{puerto_broker}'
-    ADDR_CLIENT = (SERVER_CLIENT,PORT_CLIENT)
-    hilo_servidor = threading.Thread(target= servidor(broker))
-    hilo_servidor.start()
+    try:
+        SERVER_CLIENT = sys.argv[1]
+        PORT_CLIENT = int(sys.argv[2])
+        ip_broker = sys.argv[3]
+        puerto_broker = sys.argv[4]
+        broker = f'{ip_broker}:{puerto_broker}'
+        ADDR_CLIENT = (SERVER_CLIENT,PORT_CLIENT)
+        hilo_servidor = threading.Thread(target= servidor(broker))
+        hilo_servidor.start()
+    except KeyboardInterrupt:
+        sacar_taxi(int(sys.argv[5]))
 
 else:
     print("Los argumentos son:<Ip del EC_Central><Puerto del EC_Central><Ip del broker><Puerto del broker><ID del taxi>")

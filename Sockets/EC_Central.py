@@ -26,9 +26,7 @@ Ventaja: Evita errores de "base de datos cerrada" y mantiene la conexión abiert
 """
 
 HEADER = 64
-SERVER = socket.gethostbyname(socket.gethostname())
 PORT = 6060
-ADDR=(SERVER,PORT)
 FORMAT = 'utf-8'
 
 
@@ -63,6 +61,20 @@ server_active = True  # Variable global para controlar la actividad del servidor
 
 # Crear colas para la comunicación entre hilos
 cola_taxis = Queue()
+
+
+def obtener_ip():
+    # Intenta conectarse a una dirección externa
+    try:
+        # La dirección IP 8.8.8.8 es un servidor DNS de Google
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception as e:
+        return f"Error: {e}"
+
 
 # Manejador de la señal SIGINT para cerrar la central limpiamente
 def manejar_cierre(signal, frame):
@@ -615,6 +627,8 @@ def handle_client(conn, addr,broker):
 
 def start(broker):
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    SERVER = obtener_ip()
+    ADDR=(SERVER,PORT)
     server.bind(ADDR)
     server.listen()
 
