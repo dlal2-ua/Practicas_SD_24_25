@@ -13,12 +13,11 @@ cursor = conexion.cursor()
 cursor.execute('''
 CREATE TABLE IF NOT EXISTS taxis (
     id INTEGER PRIMARY KEY,
-    destino_a_cliente CHAR NOT NULL,
-    destino_a_final CHAR NOT NULL,
+    destino_a_cliente CHAR,
+    destino_a_final CHAR,
     estado BOOLEAN ,
     coordX INTEGER NOT NULL,
-    coordY INTEGER NOT NULL,
-    pasajero CHAR 
+    coordY INTEGER NOT NULL
 
 )
 ''')
@@ -79,12 +78,12 @@ cursor.execute('''
 
 
 cursor.execute('''
-    INSERT INTO taxis (id, destino_a_cliente, destino_a_final, estado, coordX, coordY, pasajero) VALUES
-    (1, 'a', 'N', NULL, 1, 1, NULL),
-    (2, 'b', 'X', NULL, 1, 1, NULL),
-    (3, 'c', 'U', NULL, 1, 1, NULL),
-    (4, 'd', 'L', NULL, 1, 1, NULL),
-    (5, 'e', 'T', NULL, 1, 1, NULL)
+    INSERT INTO taxis (id, destino_a_cliente, destino_a_final, estado, coordX, coordY) VALUES
+    (1, NULL, NULL, NULL, 1, 1),
+    (2, NULL, NULL, NULL, 1, 1),
+    (3, NULL, NULL, NULL, 1, 1),
+    (4, NULL, NULL, NULL, 1, 1),
+    (5, NULL, NULL, NULL, 1, 1)
 ''')
 
 

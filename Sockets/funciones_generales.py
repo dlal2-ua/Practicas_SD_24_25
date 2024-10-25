@@ -39,10 +39,19 @@ def sacar_taxi(id_taxi):
     conexion.commit()
     cursor.close()
     conexion.close()
-def pasajero_dentro(id_taxi,pasajero):
+def pasajero_dentro(id_taxi,cliente,Destino):
+    c = cliente[0]
+    d = Destino[0]
     conexion = conectar_bd()
     cursor = conexion.cursor()
-    cursor.execute(f"UPDATE taxis SET pasajero = {pasajero} WHERE id == {id_taxi}")
+    cursor.execute("UPDATE taxis SET destino_a_cliente = ?, destino_a_final = ?  WHERE id == ?",(c,d,id_taxi))
+    conexion.commit()
+    cursor.close()
+    conexion.close()
+def pasajero_fuera(id_taxi):
+    conexion = conectar_bd()
+    cursor = conexion.cursor()
+    cursor.execute(f"UPDATE taxis SET destino_a_cliente = NULL, destino_a_final = NULL  WHERE id == {id_taxi}")
     conexion.commit()
     cursor.close()
     conexion.close()

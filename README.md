@@ -1,5 +1,25 @@
 MEMORIA
 
+Pasos para despliegue de la practica en 3 maquinas (1º Central, 2º Clientes y kafka, 3º Taxis):
+  - 1º Central:
+    · Cambiar la variable 'SERVER' por la ip de esta maquina
+    · En los argumentos poner la ip de la maquina donde esta ejecutado kafka
+    
+  - 2º Clientes y kafka:
+    · Meter en el disco C la carpeta de kafka -> entrar en config -> abrir el archivo server.properties y
+          > Sustituir la linea donde pone "*listener=PLAINTEXT://localhost:9092* por "*listener=PLAINTEXT://LA IP DE LA MAQUINA:9092*
+          > Sustituir la linea donde pone "*advertised.listener=PLAINTEXT://localhost:9092* por "*advertised.listener=PLAINTEXT://LA IP DE LA MAQUINA:9092*     
+    · Abrir dos cmd y hacer 'cd ..' hasta llegar a :/C, y meterse en la carpeta de kafka con este comando 'cd <nombre_carpeta_kafka>
+    · Después en un cmd ejecutar PRIMERO: **bin\windows\zookeeper-server-start.bat .\config\zookeeper.properties** y en el otro cmd ejecutar: **bin\windows\kafka-server-start.bat .\config\server.properties**
+    . Hecho esto, hay que meterse en la carpeta de sockets, y ejecutar: **python EC_Customer.py <ip de la maquina>:9092 <id cliente> <nombre_txt_servicios>**
+    
+  - 3º Taxis
+    · Se tendrán que abrir dos terminales por cada taxi que se quiera desplegar (una para el taxi, y otra para el sensor)
+    . En ambas terminales habrá que entrar en la carpeta sockets:
+        > En una ejecutar este comando: python EC_DE.py <IP de la maquina de la central> <Puerto de la central> <Ip del broker> <ID del taxi>
+        > En otra ejecutar este comando: python EC_S.py <IP local de la maquina> <Puerto del EC_DE>
+        
+
 Proceso de realización:
   -Crear la central
     · Parte del codigo que gestione la conectividad central-taxi y central-cliente (kafka)
@@ -43,3 +63,46 @@ con lo que el servidor no hace falta que conozca la ip ni el puerto del cliente.
 %KAFKA_HOME%\bin\windows\zookeeper-server-start.bat .\config\zookeeper.properties
 
 %KAFKA_HOME%\bin\windows\kafka-server-start.bat .\config\server.properties
+
+pip install git+https://github.com/dpkp/kafka-python.git
+
+
+
+bin\windows\kafka-topics.bat --create --topic SD --bootstrap-server localhost:9092
+bin\windows\kafka-topics.bat --list --bootstrap-server localhost:9092
+
+
+winget install --id Git.Git -e --source winget
+
+
+# MEMORIA
+
+## Pasos para despliegue de la práctica en 3 máquinas
+
+### 1º Central
+- Cambiar la variable `SERVER` por la IP de esta máquina.
+- En los argumentos, poner la IP de la máquina donde está ejecutado Kafka.
+
+### 2º Clientes y Kafka
+1. Meter en el disco C la carpeta de Kafka.
+2. Entrar en `config` y abrir el archivo `server.properties`.
+   - Sustituir la línea:
+     ```
+     listener=PLAINTEXT://localhost:9092
+     ```
+     por:
+     ```
+     listener=PLAINTEXT://LA IP DE LA MAQUINA:9092
+     ```
+   - Sustituir la línea:
+     ```
+     advertised.listener=PLAINTEXT://localhost:9092
+     ```
+     por:
+     ```
+     advertised.listener=PLAINTEXT://LA IP DE LA MAQUINA:9092
+     ```
+
+3. Abrir dos terminales (cmd) y hacer `cd ..` hasta llegar a `C:\`, luego entrar en la carpeta de Kafka:
+   ```bash
+   cd <nombre_carpeta_kafka>
