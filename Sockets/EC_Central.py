@@ -7,7 +7,7 @@ import queue
 import pandas as pd
 import signal
 import sqlite3
-from funciones_generales import conectar_bd
+from funciones_generales import conectar_bd,coordX_taxi,coordY_taxi,nueva_pos_taxi,pasajero_dentro,pasajero_fuera
 import numpy as np
 import matplotlib.pyplot as plt
 from queue import Queue
@@ -193,7 +193,7 @@ def hilo_lector_cliente(broker, cola_mensajes):
                 if coordX_cliente is not None and coordY_cliente is not None:
                     mensaje_asignacion = f"ID:{cliente_id} ASIGNADO TAXI:{taxi_asignado} COORDENADAS:{coordX_cliente},{coordY_cliente} DESTINO:{destino}"
                     print(f"Taxi asignado: {taxi_asignado} al cliente {cliente_id} en coordenadas {coordX_cliente}, {coordY_cliente}")
-
+                    pasajero_dentro(taxi_asignado,cliente_id,destino)
                     agregarCoordCliente(conexion, cliente_id, coordX_cliente, coordY_cliente)
 
                     # Enviar el mensaje de asignación al taxi con las coordenadas del cliente y el destino
@@ -219,7 +219,7 @@ def hilo_enviar_coordenadas_taxi(cliente_id, taxi_id, coordX_cliente, coordY_cli
     producer = KafkaProducer(bootstrap_servers=broker)
 
     # Preparar el mensaje con las coordenadas del cliente
-    mensaje_coordenadas = f"{taxi_id},{coordX_cliente},{coordY_cliente},{cliente_id}"
+    mensaje_coordenadas = f"{taxi_id},{coordX_cliente},{coordY_cliente},{cliente_id},{coordX_taxi(taxi_id)},{coordY_taxi(taxi_id)}"
     
     # Enviar mensaje al taxi a través del tópico 'CENTRAL-TAXI'
     producer.send('CENTRAL-TAXI', key=str(taxi_id).encode('utf-8'), value=mensaje_coordenadas.encode('utf-8'))
@@ -244,6 +244,7 @@ def hilo_lector_taxis(broker):
                 taxi_id = int(partes[0])
                 coordX_taxi = int(partes[1])
                 coordY_taxi = int(partes[2])
+                nueva_pos_taxi(taxi_id,coordX_taxi,coordY_taxi)
                 print(f"Taxi ID: {taxi_id}, Coordenadas: ({coordX_taxi}, {coordY_taxi})")
 
                 # Pasar las coordenadas procesadas al hilo principal mediante la cola
@@ -294,7 +295,7 @@ def procesar_coordenadas_taxi(taxi_id, coordX_taxi, coordY_taxi, broker):
                 destino_coords = obtener_destino_coords(conexion, destino)
                 if destino_coords:
                     coordX_destino, coordY_destino = destino_coords
-                    mensaje_destino = f"{taxi_id},{coordX_destino},{coordY_destino},{cliente_id}"
+                    mensaje_destino = f"{taxi_id},{coordX_destino},{coordY_destino},{cliente_id},{coordX_taxi(taxi_id)},{coordY_taxi(taxi_id)}"
                     producer.send('CENTRAL-TAXI', key=cliente_id.encode('utf-8'), value=mensaje_destino.encode('utf-8'))
                     producer.flush()
                     print(f"Enviado al taxi {taxi_id} las coordenadas del destino {destino}: {coordX_destino}, {coordY_destino}.")
@@ -311,6 +312,7 @@ def procesar_coordenadas_taxi(taxi_id, coordX_taxi, coordY_taxi, broker):
                 if abs(coordX_taxi - coordX_destino) < 0.1 and abs(coordY_taxi - coordY_destino) < 0.1 and taxi_asignado == taxi_id:
                     print(f"Taxi {taxi_id} ha llegado al destino del cliente {cliente_id}.")
                     cambiarEstadoCliente(conexion, cliente_id, "HA LLEGADO")
+                    pasajero_fuera(taxi_id)
                     cambiarPosInicialCliente(conexion, cliente_id, coordX_destino, coordY_destino)
 
                     with lock:
@@ -627,7 +629,8 @@ def handle_client(conn, addr,broker):
 
 def start(broker):
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    SERVER = obtener_ip()
+    #SERVER = obtener_ip()
+    SERVER = socket.gethostbyname(socket.gethostname())
     ADDR=(SERVER,PORT)
     server.bind(ADDR)
     server.listen()

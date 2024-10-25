@@ -3,7 +3,7 @@ import threading
 import time
 import sys
 from kafka import KafkaConsumer, KafkaProducer
-from funciones_generales import coordX_taxi,coordY_taxi,nueva_pos_taxi,pasajero_dentro,sacar_taxi
+from funciones_generales import sacar_taxi
 
 HEADER = 64
 SERVER = socket.gethostbyname(socket.gethostname())
@@ -32,41 +32,40 @@ def enviar_coord(broker,):
                 destinoX = int(partes[1])  
                 destinoY = int(partes[2])
                 pasajero = partes[3]
-
+                X_taxi = int(partes[4])
+                Y_taxi = int(partes[5])
                 # Una vez que ha llegado, puedes manejar la lógica adicional aquí (ej: recoger el pasajero)
-                if coordX_taxi(id_taxi) == destinoX and coordY_taxi(id_taxi) == destinoY:
+                if X_taxi == destinoX and Y_taxi == destinoY:
                     print(f"Taxi {id_taxi} ha llegado al destino y ha recogido al pasajero {pasajero}.")
-                    coordenada = str(id_taxi) + "," + str(coordX_taxi(id_taxi)) + "," + str(coordY_taxi(id_taxi)) + "," + str(msg_sensor)
+                    coordenada = str(id_taxi) + "," + str(X_taxi) + "," + str(Y_taxi) + "," + str(msg_sensor)
                     producer.send('TAXIS', value=coordenada.encode('utf-8'))
                     time.sleep(1)
                 else:
                     #pasajero_dentro(taxi,pasajero)
-                    while coordX_taxi(id_taxi) != destinoX and parar_hilo_enviar_coord==False:
+                    while X_taxi != destinoX and parar_hilo_enviar_coord==False:
                         if msg_sensor == "OK":
-                            if destinoX > coordX_taxi(id_taxi):
-                                nuevaX = int(coordX_taxi(id_taxi)) + 1
+                            if destinoX > X_taxi:
+                                X_taxi += 1
                             else: 
-                                nuevaX = int(coordX_taxi(id_taxi)) - 1
-                            coordenada = str(id_taxi) + "," + str(nuevaX) + "," + str(coordY_taxi(id_taxi)) + "," + str(msg_sensor)
-                            nueva_pos_taxi(id_taxi,nuevaX,coordY_taxi(id_taxi))
+                                X_taxi -= 1
+                            coordenada = str(id_taxi) + "," + str(X_taxi) + "," + str(Y_taxi) + "," + str(msg_sensor)
                             producer.send('TAXIS', value=coordenada.encode('utf-8'))
                             time.sleep(1)
-                            while coordY_taxi(id_taxi) != destinoY and parar_hilo_enviar_coord == False:
+                            while Y_taxi != destinoY and parar_hilo_enviar_coord == False:
                                 if msg_sensor == "OK":
-                                    if destinoY > coordY_taxi(id_taxi):
-                                        nuevaY = int(coordY_taxi(id_taxi)) + 1
+                                    if destinoY > Y_taxi:
+                                        Y_taxi += 1
                                     else: 
-                                        nuevaY = int(coordY_taxi(id_taxi)) - 1
-                                    coordenada = str(id_taxi) + "," + str(coordX_taxi(id_taxi)) + "," + str(nuevaY) + "," + str(msg_sensor)
-                                    nueva_pos_taxi(id_taxi,coordX_taxi(id_taxi),nuevaY)
+                                        Y_taxi -= 1
+                                    coordenada = str(id_taxi) + "," + str(X_taxi) + "," + str(Y_taxi) + "," + str(msg_sensor)
                                     producer.send('TAXIS', value=coordenada.encode('utf-8'))
                                     time.sleep(1)
                                 else:
-                                    coordenada = str(id_taxi) + "," + str(coordX_taxi(id_taxi)) + "," + str(coordY_taxi(id_taxi)) + "," + str(msg_sensor)
+                                    coordenada = str(id_taxi) + "," + str(X_taxi) + "," + str(Y_taxi) + "," + str(msg_sensor)
                                     producer.send('TAXIS', value=coordenada.encode('utf-8'))
                                     time.sleep(1)
                         else:
-                            coordenada = str(id_taxi) + "," + str(coordX_taxi(id_taxi)) + "," + str(coordY_taxi(id_taxi)) + "," + str(msg_sensor)
+                            coordenada = str(id_taxi) + "," + str(X_taxi) + "," + str(Y_taxi) + "," + str(msg_sensor)
                             producer.send('TAXIS', value=coordenada.encode('utf-8'))
                             time.sleep(1)
         except IndexError:
@@ -157,6 +156,7 @@ if (len(sys.argv)==6):
         hilo_servidor.start()
     except KeyboardInterrupt:
         sacar_taxi(int(sys.argv[5]))
+        exit(1)
 
 else:
     print("Los argumentos son:<Ip del EC_Central><Puerto del EC_Central><Ip del broker><Puerto del broker><ID del taxi>")
