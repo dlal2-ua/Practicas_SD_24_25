@@ -72,6 +72,9 @@ bin\windows\kafka-topics.bat --create --topic SD --bootstrap-server localhost:90
 bin\windows\kafka-topics.bat --list --bootstrap-server localhost:9092
 
 
+winget install --id Git.Git -e --source winget
+
+
 # MEMORIA
 
 ## Pasos para despliegue de la práctica en 3 máquinas
