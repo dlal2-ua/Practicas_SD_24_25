@@ -36,6 +36,137 @@ FORMAT = 'utf-8'
 
 
 
+###================== FUNCIONES DE BASE DE DATOS ==================###
+
+# Función para obtener destinos desde la base de datos
+
+def cambiarPosInicialCliente(conexion, id, coordX, coordY):
+    try:
+        cursor = conexion.cursor()
+        cursor.execute("UPDATE pos_inicial_cliente SET coordX = ?, coordY = ? WHERE id = ?", (coordX, coordY, id))
+        conexion.commit()
+    except sqlite3.Error as e:
+        print(f"Error al actualizar coordenadas iniciales del cliente en la base de datos: {e}")
+
+def agregarCliente(conexion, id, destino, estado, coordX, coordY):
+    try:
+        cursor = conexion.cursor()
+        cursor.execute("INSERT INTO clientes (id, destino, estado, coordX, coordY) VALUES (?, ?, ?, ?, ?)", (id, destino, estado, coordX, coordY))
+        conexion.commit()
+    except sqlite3.Error as e:
+        print(f"Error al insertar cliente en la base de datos: {e}")
+
+def buscarCliente(conexion, id):
+    try:
+        cursor = conexion.cursor()
+        cursor.execute("SELECT * FROM clientes WHERE id = ?", (id,))
+        return cursor.fetchone() is not None
+    except sqlite3.Error as e:
+        print(f"Error al buscar cliente en la base de datos: {e}")
+        return False
+
+
+
+def cambiarEstadoCliente(conexion, id, estado):
+    try:
+        cursor = conexion.cursor()
+        cursor.execute("UPDATE clientes SET estado = ? WHERE id = ?", (estado, id))
+        conexion.commit()
+    except sqlite3.Error as e:
+        print(f"Error al actualizar estado del cliente en la base de datos: {e}")
+
+
+def agregarCoordCliente(conexion, id, coordX, coordY):
+    try:
+        cursor = conexion.cursor()
+        cursor.execute("UPDATE clientes SET coordX = ?, coordY = ? WHERE id = ?", (coordX, coordY, id))
+        conexion.commit()
+    except sqlite3.Error as e:
+        print(f"Error al actualizar coordenadas del cliente en la base de datos: {e}")
+
+
+
+def obtener_destinos(conexion):
+    query = "SELECT destino, coordX, coordY FROM destinos"
+    df_destinos = pd.read_sql_query(query, conexion)
+    destinos_dict = {row['destino']: (row['coordX'], row['coordY']) for _, row in df_destinos.iterrows()}
+    return destinos_dict
+
+
+# Función para liberar un taxi después de completar el viaje
+def liberar_taxi(conexion, taxi_id):
+    cursor = conexion.cursor()
+    cursor.execute("UPDATE taxis SET estado = 1 WHERE id = ?", (taxi_id,))
+    conexion.commit()  # Asegurar que los cambios se guarden en la base de datos
+
+
+
+# Función para obtener un taxi disponible desde la base de datos
+def obtener_taxi_disponible(conexion):
+    cursor = conexion.cursor()
+
+    # Consulta para seleccionar un taxi disponible (estado = 1)
+    cursor.execute("SELECT id FROM taxis WHERE estado = 1 LIMIT 1")
+    taxi = cursor.fetchone()
+
+    # Si se encuentra un taxi disponible, cambiar su estado a ocupado (0)
+    if taxi:
+        taxi_id = taxi[0]
+        cursor.execute("UPDATE taxis SET estado = 0 WHERE id = ?", (taxi_id,))
+        conexion.commit()  # Asegurar que los cambios se guarden en la base de datos
+        return taxi_id
+    else:
+        return None  # No hay taxis disponibles
+
+
+# Función para obtener las coordenadas iniciales del cliente
+def obtener_pos_inicial_cliente(cliente_id):
+    # Establecer una nueva conexión a la base de datos para cada hilo
+    conexion = conectar_bd()
+    try:
+        # Usar parámetros en la consulta para evitar inyección SQL
+        query = "SELECT coordX, coordY FROM pos_inicial_cliente WHERE id = ?"
+        df_pos_inicial = pd.read_sql_query(query, conexion, params=(cliente_id,))
+        if not df_pos_inicial.empty:
+            return df_pos_inicial['coordX'][0], df_pos_inicial['coordY'][0]
+        else:
+            print(f"No se encontraron coordenadas para el cliente {cliente_id}.")
+            return None, None  # Manejo del error
+    finally:
+        conexion.close()  # Asegúrate de cerrar la conexión después de usarla
+
+
+
+# Función para obtener las coordenadas del destino desde la base de datos
+def obtener_destino_coords(conexion, destino):
+    query = "SELECT coordX, coordY FROM destinos WHERE destino = ?"
+    cursor = conexion.cursor()
+    cursor.execute(query, (destino,))
+    resultado = cursor.fetchone()
+
+    if resultado:
+        return resultado[0], resultado[1]  # Retornar coordX y coordY
+    else:
+        print(f"No se encontraron coordenadas para el destino {destino}")
+        return None
+    
+def obtener_taxis(conexion):
+   
+    cursor = conexion.cursor()
+    query = """
+        SELECT id, coordX, coordY, estado
+        FROM taxis;
+    """
+    cursor.execute(query)
+    taxis = cursor.fetchall()
+    return taxis  # Retorna una lista de tuplas: (taxi_id, coordX, coordY, estado)
+
+
+###===========================================================================
+###===========================================================================
+
+
+
 # Inicializar una tabla (DataFrame) con las columnas ID, DESTINO, ESTADO
 tabla = pd.DataFrame(columns=["ID", "DESTINO", "ESTADO"])
 
@@ -256,17 +387,20 @@ def hilo_lector_taxis(broker):
 
 
 
+clientes_en_taxi_global = []  # Lista de clientes ya recogidos y en trayecto
+taxis_estados = {}  # Diccionario para almacenar estados de cada taxi
 
-clientes_en_taxi_global = []  # Clientes ya recogidos y en trayecto
 def procesar_coordenadas_taxi(taxi_id, coordX_taxi, coordY_taxi, broker):
     conexion = conectar_bd()
     producer = KafkaProducer(bootstrap_servers=broker)
 
-    try:
-        taxis_en_tablero = []
+    # Si el taxi no tiene un estado inicial, inicializarlo
+    if taxi_id not in taxis_estados:
+        taxis_estados[taxi_id] = []  # Inicializa la lista de estados para el taxi
 
+    try:
         # Procesar clientes que están esperando ser recogidos por un taxi
-        for cliente in clientes_a_mostrar_global:
+        for cliente in clientes_a_mostrar_global[:]:  # Usar una copia de la lista
             cliente_id, destino, (coordX_cliente, coordY_cliente) = cliente
 
             # Verificar si el taxi ha llegado a la posición del cliente
@@ -282,9 +416,6 @@ def procesar_coordenadas_taxi(taxi_id, coordX_taxi, coordY_taxi, broker):
                 clientes_a_mostrar_global.remove(cliente)
                 clientes_en_taxi_global.append((cliente_id, destino, taxi_id))
 
-                # Actualizar la lista de taxis en el tablero
-                taxis_en_tablero.append((taxi_id, coordX_taxi, coordY_taxi, 0, cliente_id))
-
                 # Enviar confirmación al cliente
                 mensaje_confirmacion = f"ID:{cliente_id} IN"
                 producer.send('CENTRAL-CLIENTE', key=cliente_id.encode('utf-8'), value=mensaje_confirmacion.encode('utf-8'))
@@ -295,13 +426,15 @@ def procesar_coordenadas_taxi(taxi_id, coordX_taxi, coordY_taxi, broker):
                 destino_coords = obtener_destino_coords(conexion, destino)
                 if destino_coords:
                     coordX_destino, coordY_destino = destino_coords
-                    mensaje_destino = f"{taxi_id},{coordX_destino},{coordY_destino},{cliente_id},{coordX_taxi(taxi_id)},{coordY_taxi(taxi_id)}"
+                    mensaje_destino = f"{taxi_id},{coordX_destino},{coordY_destino},{cliente_id}"
                     producer.send('CENTRAL-TAXI', key=cliente_id.encode('utf-8'), value=mensaje_destino.encode('utf-8'))
                     producer.flush()
                     print(f"Enviado al taxi {taxi_id} las coordenadas del destino {destino}: {coordX_destino}, {coordY_destino}.")
-            else:
-                # Si no se ha recogido a un cliente, actualizar el taxi como en movimiento
-                taxis_en_tablero.append((taxi_id, coordX_taxi, coordY_taxi, 1, None))
+                
+                continue  # Continuar al siguiente cliente
+
+        # Agregar el estado del taxi a la lista de estados
+        taxis_estados[taxi_id].append((coordX_taxi, coordY_taxi, 0, None))  # Inicialmente, el taxi está en movimiento sin cliente
 
         # Procesar clientes que están en trayecto en el taxi
         for cliente_id, destino, taxi_asignado in clientes_en_taxi_global:
@@ -312,7 +445,6 @@ def procesar_coordenadas_taxi(taxi_id, coordX_taxi, coordY_taxi, broker):
                 if abs(coordX_taxi - coordX_destino) < 0.1 and abs(coordY_taxi - coordY_destino) < 0.1 and taxi_asignado == taxi_id:
                     print(f"Taxi {taxi_id} ha llegado al destino del cliente {cliente_id}.")
                     cambiarEstadoCliente(conexion, cliente_id, "HA LLEGADO")
-                    pasajero_fuera(taxi_id)
                     cambiarPosInicialCliente(conexion, cliente_id, coordX_destino, coordY_destino)
 
                     with lock:
@@ -327,186 +459,22 @@ def procesar_coordenadas_taxi(taxi_id, coordX_taxi, coordY_taxi, broker):
 
                     # Liberar el taxi
                     liberar_taxi(conexion, taxi_id)
+                    taxis_estados[taxi_id].append((coordX_taxi, coordY_taxi, 1, None))
+
 
                     # Eliminar al cliente de la lista de clientes en trayecto
                     clientes_en_taxi_global.remove((cliente_id, destino, taxi_asignado))
-
-                    # Actualizar la lista de taxis en el tablero (sin cliente)
-                    taxis_en_tablero = [(tid, x, y, 1, None) if tid == taxi_id else (tid, x, y, cid) for tid, x, y, cid in taxis_en_tablero]
                 else:
-                    # Mantener al cliente en el taxi durante el trayecto
-                    taxis_en_tablero.append((taxi_id, coordX_taxi, coordY_taxi, 0, cliente_id))
+                    # Actualizar el estado del taxi para incluir al cliente en trayecto
+                    taxis_estados[taxi_id].append((coordX_taxi, coordY_taxi, 0, cliente_id))
 
     finally:
         conexion.close()
 
-    return taxis_en_tablero
+    return taxis_estados[taxi_id]  # Devolver el estado del taxi específico
 
 
-
-
-###================== FUNCIONES DE BASE DE DATOS ==================###
-
-# Función para obtener destinos desde la base de datos
-
-def cambiarPosInicialCliente(conexion, id, coordX, coordY):
-    try:
-        cursor = conexion.cursor()
-        cursor.execute("UPDATE pos_inicial_cliente SET coordX = ?, coordY = ? WHERE id = ?", (coordX, coordY, id))
-        conexion.commit()
-    except sqlite3.Error as e:
-        print(f"Error al actualizar coordenadas iniciales del cliente en la base de datos: {e}")
-
-def agregarCliente(conexion, id, destino, estado, coordX, coordY):
-    try:
-        cursor = conexion.cursor()
-        cursor.execute("INSERT INTO clientes (id, destino, estado, coordX, coordY) VALUES (?, ?, ?, ?, ?)", (id, destino, estado, coordX, coordY))
-        conexion.commit()
-    except sqlite3.Error as e:
-        print(f"Error al insertar cliente en la base de datos: {e}")
-
-def buscarCliente(conexion, id):
-    try:
-        cursor = conexion.cursor()
-        cursor.execute("SELECT * FROM clientes WHERE id = ?", (id,))
-        return cursor.fetchone() is not None
-    except sqlite3.Error as e:
-        print(f"Error al buscar cliente en la base de datos: {e}")
-        return False
-
-
-
-def cambiarEstadoCliente(conexion, id, estado):
-    try:
-        cursor = conexion.cursor()
-        cursor.execute("UPDATE clientes SET estado = ? WHERE id = ?", (estado, id))
-        conexion.commit()
-    except sqlite3.Error as e:
-        print(f"Error al actualizar estado del cliente en la base de datos: {e}")
-
-
-def agregarCoordCliente(conexion, id, coordX, coordY):
-    try:
-        cursor = conexion.cursor()
-        cursor.execute("UPDATE clientes SET coordX = ?, coordY = ? WHERE id = ?", (coordX, coordY, id))
-        conexion.commit()
-    except sqlite3.Error as e:
-        print(f"Error al actualizar coordenadas del cliente en la base de datos: {e}")
-
-
-
-def obtener_destinos(conexion):
-    query = "SELECT destino, coordX, coordY FROM destinos"
-    df_destinos = pd.read_sql_query(query, conexion)
-    destinos_dict = {row['destino']: (row['coordX'], row['coordY']) for _, row in df_destinos.iterrows()}
-    return destinos_dict
-
-
-# Función para liberar un taxi después de completar el viaje
-def liberar_taxi(conexion, taxi_id):
-    cursor = conexion.cursor()
-    cursor.execute("UPDATE taxis SET estado = 1 WHERE id = ?", (taxi_id,))
-    conexion.commit()  # Asegurar que los cambios se guarden en la base de datos
-
-
-
-# Función para obtener un taxi disponible desde la base de datos
-def obtener_taxi_disponible(conexion):
-    cursor = conexion.cursor()
-
-    # Consulta para seleccionar un taxi disponible (estado = 1)
-    cursor.execute("SELECT id FROM taxis WHERE estado = 1 LIMIT 1")
-    taxi = cursor.fetchone()
-
-    # Si se encuentra un taxi disponible, cambiar su estado a ocupado (0)
-    if taxi:
-        taxi_id = taxi[0]
-        cursor.execute("UPDATE taxis SET estado = 0 WHERE id = ?", (taxi_id,))
-        conexion.commit()  # Asegurar que los cambios se guarden en la base de datos
-        return taxi_id
-    else:
-        return None  # No hay taxis disponibles
-
-
-# Función para obtener las coordenadas iniciales del cliente
-def obtener_pos_inicial_cliente(cliente_id):
-    # Establecer una nueva conexión a la base de datos para cada hilo
-    conexion = conectar_bd()
-    try:
-        # Usar parámetros en la consulta para evitar inyección SQL
-        query = "SELECT coordX, coordY FROM pos_inicial_cliente WHERE id = ?"
-        df_pos_inicial = pd.read_sql_query(query, conexion, params=(cliente_id,))
-        if not df_pos_inicial.empty:
-            return df_pos_inicial['coordX'][0], df_pos_inicial['coordY'][0]
-        else:
-            print(f"No se encontraron coordenadas para el cliente {cliente_id}.")
-            return None, None  # Manejo del error
-    finally:
-        conexion.close()  # Asegúrate de cerrar la conexión después de usarla
-
-
-
-# Función para obtener las coordenadas del destino desde la base de datos
-def obtener_destino_coords(conexion, destino):
-    query = "SELECT coordX, coordY FROM destinos WHERE destino = ?"
-    cursor = conexion.cursor()
-    cursor.execute(query, (destino,))
-    resultado = cursor.fetchone()
-
-    if resultado:
-        return resultado[0], resultado[1]  # Retornar coordX y coordY
-    else:
-        print(f"No se encontraron coordenadas para el destino {destino}")
-        return None
-    
-def obtener_taxis(conexion):
-   
-    cursor = conexion.cursor()
-    query = """
-        SELECT id, coordX, coordY, estado
-        FROM taxis;
-    """
-    cursor.execute(query)
-    taxis = cursor.fetchall()
-    return taxis  # Retorna una lista de tuplas: (taxi_id, coordX, coordY, estado)
-
-
-###===========================================================================
-###===========================================================================
-
-def procesar_taxis(conexion, clientes):
-
-    taxis_en_tablero = []
-    taxis = obtener_taxis(conexion)
-
-    for taxi_id, coordX_taxi, coordY_taxi, estado in taxis:
-        cliente_en_taxi = None
-
-        # Verificar si el taxi ha llegado a la posición de algún cliente
-        for cliente_id, destino, (coordX_cliente, coordY_cliente) in clientes:
-            if abs(coordX_taxi - coordX_cliente) < 0.1 and abs(coordY_taxi - coordY_cliente) < 0.1:
-                cliente_en_taxi = cliente_id
-                clientes_a_mostrar_global.remove((cliente_id, destino, (coordX_cliente, coordY_cliente)))  # Remover cliente de la lista
-                print(f"Taxi {taxi_id} ha recogido al cliente {cliente_id}.")  # Imprimir mensaje de recogida
-                break  # Salir del bucle si se ha recogido a un cliente
-
-        # Añadir taxi al tablero con el cliente si lo ha recogido
-        taxis_en_tablero.append((taxi_id, coordX_taxi, coordY_taxi, estado, cliente_en_taxi))
-
-        # Imprimir el cliente en taxi (puede ser None si no hay cliente)
-        if cliente_en_taxi:
-            print(f"Cliente en taxi: {cliente_en_taxi}")
-        else:
-            print("No hay cliente en taxi.")
-
-    return taxis_en_tablero
-
-
-
-
-# Función para actualizar el tablero (solo en el hilo principal)
-def actualizar_tablero(ax, destinos, clientes, taxis):
-    """Actualiza el tablero con las posiciones actuales."""
+def actualizar_tablero(ax, destinos, clientes):
     # Limpiar el tablero de elementos anteriores (patches y texts)
     
     # Eliminar patches (rectángulos, que representan destinos y taxis)
@@ -517,25 +485,27 @@ def actualizar_tablero(ax, destinos, clientes, taxis):
     for txt in ax.texts[:]:
         txt.remove()
 
+    # Agregar destinos
     for label, (x, y) in destinos.items():
         ax.add_patch(plt.Rectangle((x - 1, y - 1), 1, 1, color="deepskyblue"))
         ax.text(x - 0.5, y - 0.5, label, va='center', ha='center', fontsize=10, color="black")
 
+    # Agregar clientes
     for cliente_id, destino, (coordX, coordY) in clientes:
         ax.add_patch(plt.Rectangle((coordX - 1, coordY - 1), 1, 1, color="yellow"))
         ax.text(coordX - 0.5, coordY - 0.5, cliente_id, fontsize=10, ha='center', va='center', color='black')
 
-    for taxi_id, coordX_taxi, coordY_taxi, estado, cliente_en_taxi in taxis:
-        color_taxi = "green" if estado == 0 else "red"  # Verde si está en movimiento, rojo si está estacionado
-        ax.add_patch(plt.Rectangle((coordX_taxi - 1, coordY_taxi - 1), 1, 1, color=color_taxi))
-        if cliente_en_taxi:
-            ax.text(coordX_taxi - 0.5, coordY_taxi - 0.5, f"{taxi_id}-{cliente_en_taxi}", fontsize=8, ha='center', va='center', color='black')
-        else:
-            ax.text(coordX_taxi - 0.5, coordY_taxi - 0.5, f"{taxi_id}", fontsize=10, ha='center', va='center', color='black')
+    # Agregar solo la última posición de cada taxi
+    for taxi_id, estados in taxis_estados.items():
+        if estados:  # Verificar que hay estados registrados
+            coordX_taxi, coordY_taxi, estado, cliente_en_taxi = estados[-1]  # Tomar solo el último estado
+            color_taxi = "red" if cliente_en_taxi is not None else "green"  # Rojo si hay un cliente en el taxi, verde si está libre
+            ax.add_patch(plt.Rectangle((coordX_taxi - 1, coordY_taxi - 1), 1, 1, color=color_taxi))
+            texto_taxi = f"{taxi_id}" if cliente_en_taxi is None else f"{taxi_id}-{cliente_en_taxi}"  # Mostrar taxi_id y cliente_id solo si el taxi lo ha recogido
+            ax.text(coordX_taxi - 0.5, coordY_taxi - 0.5, texto_taxi, fontsize=10, ha='center', va='center', color="black")
 
     plt.draw()
     plt.pause(0.01)
-
 
 
 def iniciar_central(broker):
@@ -556,7 +526,7 @@ def iniciar_central(broker):
 
     conexion = conectar_bd()
     destinos = obtener_destinos(conexion)
-    actualizar_tablero(ax, destinos, [], [])  # Inicialmente, sin clientes ni taxis
+    actualizar_tablero(ax, destinos, [])  # Inicialmente, sin clientes ni taxis
 
     # Iniciar hilo para escuchar mensajes de clientes
     hilo_lector = threading.Thread(target=hilo_lector_cliente, args=(broker, cola_mensajes))
@@ -571,26 +541,19 @@ def iniciar_central(broker):
         while central_activa:
             # Procesar mensajes en la cola (coordenadas de taxis)
             while not cola_taxis.empty():
-                taxi_id, coordX_taxi, coordY_taxi = cola_taxis.get()
-                
-                # Procesar las coordenadas del taxi y obtener taxis en el tablero
-                taxis_en_tablero = procesar_coordenadas_taxi(taxi_id, coordX_taxi, coordY_taxi, broker)
-
-                # Actualizar el tablero con los taxis procesados
-                #taxis_en_tablero = procesar_taxis(conexion, clientes_a_mostrar_global)
-                actualizar_tablero(ax, destinos, clientes_a_mostrar_global, taxis_en_tablero)
+                try:
+                    taxi_id, coordX_taxi, coordY_taxi = cola_taxis.get_nowait()  # Usa get_nowait para no bloquear
+                    procesar_coordenadas_taxi(taxi_id, coordX_taxi, coordY_taxi, broker)  # No es necesario guardar aquí
+                    actualizar_tablero(ax, destinos, clientes_a_mostrar_global)
+                except Exception as e:
+                    print(f"Error al procesar taxi: {e}")
 
             plt.pause(0.1)  # Permitir actualizaciones de la GUI
     except Exception as e:
-        print(f"Ocurrió un error: {e}")
+        print(f"Ocurrió un error en el bucle principal: {e}")
     finally:
-        print("Cerrando hilos...")
-        # Aquí podrías tener lógica para cerrar los hilos de manera ordenada si es necesario
-        hilo_lector.join()  # Esperar a que termine el hilo del lector
-        hilo_lector_taxis_thread.join()  # Esperar a que termine el hilo de taxis
-        conexion.close()  # Cerrar la conexión a la base de datos
+        exit(0)  # Salir del programa después de cerrar la ventana de Matplotlib
         print("Central cerrada correctamente.")
-    
 
 
 
