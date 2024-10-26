@@ -35,7 +35,7 @@ def coordY_taxi(id_taxi):
 def sacar_taxi(id_taxi):
     conexion = conectar_bd()
     cursor = conexion.cursor()
-    cursor.execute(f"UPDATE taxis SET estado = NULL WHERE id = {id_taxi}")
+    cursor.execute(f"UPDATE taxis SET estado = NULL, destino_a_cliente = NULL, destino_a_final = NULL WHERE id = {id_taxi}")
     conexion.commit()
     cursor.close()
     conexion.close()

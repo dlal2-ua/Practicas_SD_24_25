@@ -426,7 +426,7 @@ def procesar_coordenadas_taxi(taxi_id, coordX_taxi, coordY_taxi, broker):
                 destino_coords = obtener_destino_coords(conexion, destino)
                 if destino_coords:
                     coordX_destino, coordY_destino = destino_coords
-                    mensaje_destino = f"{taxi_id},{coordX_destino},{coordY_destino},{cliente_id}"
+                    mensaje_destino = f"{taxi_id},{coordX_destino},{coordY_destino},{cliente_id},{coordX_taxi(taxi_id)},{coordY_taxi(taxi_id)}"
                     producer.send('CENTRAL-TAXI', key=cliente_id.encode('utf-8'), value=mensaje_destino.encode('utf-8'))
                     producer.flush()
                     print(f"Enviado al taxi {taxi_id} las coordenadas del destino {destino}: {coordX_destino}, {coordY_destino}.")
