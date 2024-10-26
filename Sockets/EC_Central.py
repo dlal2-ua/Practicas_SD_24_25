@@ -7,7 +7,7 @@ import queue
 import pandas as pd
 import signal
 import sqlite3
-from funciones_generales import conectar_bd,coordX_taxi,coordY_taxi,nueva_pos_taxi,pasajero_dentro,pasajero_fuera
+from funciones_generales import conectar_bd, coordX_taxi,coordY_taxi,nueva_pos_taxi,pasajero_dentro,pasajero_fuera
 import numpy as np
 import matplotlib.pyplot as plt
 from queue import Queue
@@ -375,6 +375,7 @@ def hilo_lector_taxis(broker):
                 taxi_id = int(partes[0])
                 coordX_taxi = int(partes[1])
                 coordY_taxi = int(partes[2])
+
                 nueva_pos_taxi(taxi_id,coordX_taxi,coordY_taxi)
                 print(f"Taxi ID: {taxi_id}, Coordenadas: ({coordX_taxi}, {coordY_taxi})")
 
@@ -426,7 +427,7 @@ def procesar_coordenadas_taxi(taxi_id, coordX_taxi, coordY_taxi, broker):
                 destino_coords = obtener_destino_coords(conexion, destino)
                 if destino_coords:
                     coordX_destino, coordY_destino = destino_coords
-                    mensaje_destino = f"{taxi_id},{coordX_destino},{coordY_destino},{cliente_id},{coordX_taxi(taxi_id)},{coordY_taxi(taxi_id)}"
+                    mensaje_destino = f"{taxi_id},{coordX_cliente},{coordY_cliente},{cliente_id}"
                     producer.send('CENTRAL-TAXI', key=cliente_id.encode('utf-8'), value=mensaje_destino.encode('utf-8'))
                     producer.flush()
                     print(f"Enviado al taxi {taxi_id} las coordenadas del destino {destino}: {coordX_destino}, {coordY_destino}.")
