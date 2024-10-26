@@ -162,13 +162,39 @@ def obtener_taxis(conexion):
     return taxis  # Retorna una lista de tuplas: (taxi_id, coordX, coordY, estado)
 
 
+# Función para obtener los datos del taxi de la base de datos
+def obtener_datos_taxi(conexion, taxi_id):
+    cursor = conexion.cursor()
+    # Supongamos que la base de datos tiene los campos necesarios para ambos destinos y el estado del pasajero
+    cursor.execute("SELECT destino_a_cliente, destino_a_final, estado, coordX, coordY, pasajero FROM taxis WHERE id = ?", (taxi_id,))
+    resultado = cursor.fetchone()
+
+    if resultado:
+        destino_al_cliente, destino_a_final, estado, coordX, coordY, estado_pasajero = resultado
+        return destino_al_cliente, destino_a_final, estado, coordX, coordY, estado_pasajero
+    return None, None, None, None, None, None
+
+def subir_pasajero(conexion, taxi_id):
+    cursor = conexion.cursor()
+    cursor.execute("UPDATE taxis SET pasajero = 1 WHERE id = ?", (taxi_id,))
+    conexion.commit()  # Asegurar que los cambios se guarden en la base de datos
+
+def bajar_pasajero(conexion, taxi_id):
+    cursor = conexion.cursor()
+    cursor.execute("UPDATE taxis SET pasajero = 0 WHERE id = ?", (taxi_id,))
+    conexion.commit()  # Asegurar que los cambios se guarden en la base de datos
+
+
 ###===========================================================================
 ###===========================================================================
 
 
 
 # Inicializar una tabla (DataFrame) con las columnas ID, DESTINO, ESTADO
-tabla = pd.DataFrame(columns=["ID", "DESTINO", "ESTADO"])
+tabla_cliente = pd.DataFrame(columns=["ID", "DESTINO", "ESTADO"])
+
+# Tabla global para los taxis
+tabla_taxis = pd.DataFrame(columns=["ID", "DESTINO", "ESTADO", "COORD_X", "COORD_Y"])
 
 # Cola para almacenar los mensajes entrantes de los clientes
 cola_mensajes = queue.Queue()
@@ -180,7 +206,8 @@ cola_tablero = queue.Queue()
 clientes_tablero = set()
 
 # Bloqueo para sincronizar la tabla
-lock = threading.Lock()
+lock_clientes = threading.Lock()
+lock_taxis = threading.Lock()
 
 # ** Lista global para mantener todos los clientes visibles en el tablero
 clientes_a_mostrar_global = []
@@ -216,14 +243,14 @@ def manejar_cierre(signal, frame):
 
 
 # Función para imprimir la tabla de clientes solo si hay datos
-def imprimir_tabla():
-    global tabla
+def imprimir_tabla_clientes():
+    global tabla_cliente
     print("\nTabla de Clientes:")
     print("+---------+---------+------------+")
     print("|   ID    | DESTINO |   ESTADO   |")
     print("+---------+---------+------------+")
-    if not tabla.empty:
-        for _, row in tabla.iterrows():
+    if not tabla_cliente.empty:
+        for _, row in tabla_cliente.iterrows():
             print(f"|   {row['ID']:<5}  | {row['DESTINO']:<7} | {row['ESTADO']:<10} |")
     else:
         print("|          NO HAY DATOS          |")
@@ -231,12 +258,12 @@ def imprimir_tabla():
 
 # Función para actualizar la tabla de clientes
 def actualizar_tabla(cliente_id, destino):
-    global tabla
-    with lock:
+    global tabla_cliente
+    with lock_clientes:
         # Verificar si el cliente ya está en la tabla
-        if cliente_id in tabla['ID'].values:
+        if cliente_id in tabla_cliente['ID'].values:
             # Actualizar el destino y estado del cliente existente
-            tabla.loc[tabla['ID'] == cliente_id, ['DESTINO', 'ESTADO']] = [destino, 'EN ESPERA']
+            tabla_cliente.loc[tabla_cliente['ID'] == cliente_id, ['DESTINO', 'ESTADO']] = [destino, 'EN ESPERA']
             print(f"\nActualización: Cliente {cliente_id} actualizado con destino {destino}. Estado: EN ESPERA.")
         else:
             # Agregar un nuevo cliente a la tabla si no existe
@@ -245,11 +272,59 @@ def actualizar_tabla(cliente_id, destino):
                 "DESTINO": [destino],
                 "ESTADO": ["EN ESPERA"]
             })
-            tabla = pd.concat([tabla, nueva_fila], ignore_index=True)
+            tabla_cliente = pd.concat([tabla_cliente, nueva_fila], ignore_index=True)
             print(f"\nNuevo cliente añadido: {cliente_id}. Destino: {destino}. Estado: EN ESPERA.")
 
         # Imprimir la tabla actualizada
-        imprimir_tabla()
+        imprimir_tabla_clientes()
+
+# Función para imprimir la tabla de taxis solo si hay datos
+def imprimir_tabla_taxis():
+    global tabla_taxis
+    print("\nTabla de Taxis:")
+    print("+---------+---------+------------------+----------+----------+")
+    print("|   ID    | DESTINO |      ESTADO      | COORD_X  | COORD_Y  |")
+    print("+---------+---------+------------------+----------+----------+")
+    if not tabla_taxis.empty:
+        for _, row in tabla_taxis.iterrows():
+            print(f"|   {row['ID']:<5}  | {row['DESTINO']:<7} | {row['ESTADO']:<16} | {row['COORD_X']:<8} | {row['COORD_Y']:<8} |")
+    else:
+        print("|                NO HAY DATOS                 |")
+    print("+---------+---------+------------------+----------+----------+")
+
+
+# Función para actualizar la tabla de taxis con el destino correspondiente
+def actualizar_tabla_taxis(taxi_id):
+    conexion = conectar_bd()
+    global tabla_taxis
+    with lock_taxis:
+        destino_a_cliente, destino_a_final, estado, coordX, coordY, pasajero = obtener_datos_taxi(conexion, taxi_id)
+
+        if destino_a_cliente is not None:  # Verificar si el taxi está registrado en la base de datos
+            # Determinar el destino actual en función del estado del pasajero
+            destino_actual = destino_a_cliente if pasajero == 0 else destino_a_final
+            estado_actual = f"HACIA ({'CLIENTE' if pasajero == 0 else 'DESTINO'})" if estado == 0 and pasajero == 1 else "DISPONIBLE"
+
+            # Verificar si el taxi ya está en la tabla
+            if taxi_id in tabla_taxis['ID'].values:
+                # Actualizar los datos en la tabla
+                tabla_taxis.loc[tabla_taxis['ID'] == taxi_id, 
+                                ['DESTINO', 'ESTADO', 'COORD_X', 'COORD_Y']] = [
+                                    destino_actual, estado_actual, coordX, coordY
+                                ]
+            else:
+                # Agregar un nuevo taxi a la tabla si no existe
+                nueva_fila = pd.DataFrame({
+                    "ID": [taxi_id],
+                    "DESTINO": [destino_actual],
+                    "ESTADO": [estado_actual],
+                    "COORD_X": [coordX],
+                    "COORD_Y": [coordY]
+                })
+                tabla_taxis = pd.concat([tabla_taxis, nueva_fila], ignore_index=True)
+
+            # Imprimir la tabla actualizada
+            imprimir_tabla_taxis()
 
 
 ## Función para recibir mensajes de clientes y actualizar la tabla
@@ -326,6 +401,7 @@ def hilo_lector_cliente(broker, cola_mensajes):
                     print(f"Taxi asignado: {taxi_asignado} al cliente {cliente_id} en coordenadas {coordX_cliente}, {coordY_cliente}")
                     pasajero_dentro(taxi_asignado,cliente_id,destino)
                     agregarCoordCliente(conexion, cliente_id, coordX_cliente, coordY_cliente)
+                    actualizar_tabla_taxis(taxi_asignado)
 
                     # Enviar el mensaje de asignación al taxi con las coordenadas del cliente y el destino
                     producer.send('CENTRAL-CLIENTE', key=cliente_id.encode('utf-8'), value=mensaje_asignacion.encode('utf-8'))
@@ -370,6 +446,7 @@ def hilo_lector_taxis(broker):
     while central_activa:
         for message in consumer:
             mensaje = message.value.decode('utf-8')
+            print(f"Mensaje recibido del taxi: {mensaje}")
             try:
                 partes = mensaje.split(",")
                 taxi_id = int(partes[0])
@@ -377,6 +454,8 @@ def hilo_lector_taxis(broker):
                 coordY_taxi = int(partes[2])
 
                 nueva_pos_taxi(taxi_id,coordX_taxi,coordY_taxi)
+                actualizar_tabla_taxis(taxi_id)
+                
                 print(f"Taxi ID: {taxi_id}, Coordenadas: ({coordX_taxi}, {coordY_taxi})")
 
                 # Pasar las coordenadas procesadas al hilo principal mediante la cola
@@ -391,7 +470,7 @@ def hilo_lector_taxis(broker):
 clientes_en_taxi_global = []  # Lista de clientes ya recogidos y en trayecto
 taxis_estados = {}  # Diccionario para almacenar estados de cada taxi
 
-def procesar_coordenadas_taxi(taxi_id, coordX_taxi, coordY_taxi, broker):
+def procesar_coordenadas_taxi(taxi_id, coordX_taxi_, coordY_taxi_, broker):
     conexion = conectar_bd()
     producer = KafkaProducer(bootstrap_servers=broker)
 
@@ -405,13 +484,17 @@ def procesar_coordenadas_taxi(taxi_id, coordX_taxi, coordY_taxi, broker):
             cliente_id, destino, (coordX_cliente, coordY_cliente) = cliente
 
             # Verificar si el taxi ha llegado a la posición del cliente
-            if abs(coordX_taxi - coordX_cliente) < 0.1 and abs(coordY_taxi - coordY_cliente) < 0.1:
+            if abs(coordX_taxi_ - coordX_cliente) < 0.1 and abs(coordY_taxi_ - coordY_cliente) < 0.1:
                 print(f"Taxi {taxi_id} ha recogido al cliente {cliente_id}.")
-                cambiarEstadoCliente(conexion, cliente_id, f"EN TAXI {taxi_id}")
 
-                with lock:
-                    tabla.loc[tabla['ID'] == cliente_id, 'ESTADO'] = f"EN TAXI {taxi_id}"
-                    imprimir_tabla()
+                cambiarEstadoCliente(conexion, cliente_id, f"EN TAXI {taxi_id}")
+                subir_pasajero(conexion, taxi_id)
+                actualizar_tabla_taxis(taxi_id)
+                agregarCoordCliente(conexion, cliente_id, coordX_taxi_, coordY_taxi_)
+
+                with lock_clientes:
+                    tabla_cliente.loc[tabla_cliente['ID'] == cliente_id, 'ESTADO'] = f"EN TAXI {taxi_id}"
+                    imprimir_tabla_clientes()
 
                 # Mover al cliente de la lista de clientes esperando a la lista de clientes en taxi
                 clientes_a_mostrar_global.remove(cliente)
@@ -427,7 +510,7 @@ def procesar_coordenadas_taxi(taxi_id, coordX_taxi, coordY_taxi, broker):
                 destino_coords = obtener_destino_coords(conexion, destino)
                 if destino_coords:
                     coordX_destino, coordY_destino = destino_coords
-                    mensaje_destino = f"{taxi_id},{coordX_cliente},{coordY_cliente},{cliente_id}"
+                    mensaje_destino = f"{taxi_id},{coordX_destino},{coordY_destino},{cliente_id}, {coordX_taxi_},{coordY_taxi_}"
                     producer.send('CENTRAL-TAXI', key=cliente_id.encode('utf-8'), value=mensaje_destino.encode('utf-8'))
                     producer.flush()
                     print(f"Enviado al taxi {taxi_id} las coordenadas del destino {destino}: {coordX_destino}, {coordY_destino}.")
@@ -435,7 +518,7 @@ def procesar_coordenadas_taxi(taxi_id, coordX_taxi, coordY_taxi, broker):
                 continue  # Continuar al siguiente cliente
 
         # Agregar el estado del taxi a la lista de estados
-        taxis_estados[taxi_id].append((coordX_taxi, coordY_taxi, 0, None))  # Inicialmente, el taxi está en movimiento sin cliente
+        taxis_estados[taxi_id].append((coordX_taxi_, coordY_taxi_, 0, None))  # Inicialmente, el taxi está en movimiento sin cliente
 
         # Procesar clientes que están en trayecto en el taxi
         for cliente_id, destino, taxi_asignado in clientes_en_taxi_global:
@@ -443,14 +526,14 @@ def procesar_coordenadas_taxi(taxi_id, coordX_taxi, coordY_taxi, broker):
             if destino_coords:
                 coordX_destino, coordY_destino = destino_coords
                 # Verificar si el taxi ha llegado al destino del cliente
-                if abs(coordX_taxi - coordX_destino) < 0.1 and abs(coordY_taxi - coordY_destino) < 0.1 and taxi_asignado == taxi_id:
+                if abs(coordX_taxi_ - coordX_destino) < 0.1 and abs(coordY_taxi_ - coordY_destino) < 0.1 and taxi_asignado == taxi_id:
                     print(f"Taxi {taxi_id} ha llegado al destino del cliente {cliente_id}.")
                     cambiarEstadoCliente(conexion, cliente_id, "HA LLEGADO")
                     cambiarPosInicialCliente(conexion, cliente_id, coordX_destino, coordY_destino)
 
-                    with lock:
-                        tabla.loc[tabla['ID'] == cliente_id, 'ESTADO'] = 'HA LLEGADO'
-                    imprimir_tabla()
+                    with lock_clientes:
+                        tabla_cliente.loc[tabla_cliente['ID'] == cliente_id, 'ESTADO'] = 'HA LLEGADO'
+                        imprimir_tabla_clientes()
 
                     # Enviar confirmación de llegada al cliente
                     mensaje_confirmacion = f"ID:{cliente_id} OK"
@@ -459,15 +542,18 @@ def procesar_coordenadas_taxi(taxi_id, coordX_taxi, coordY_taxi, broker):
                     print(f"Confirmación enviada al cliente {cliente_id}: {mensaje_confirmacion}")
 
                     # Liberar el taxi
+                    bajar_pasajero(conexion, taxi_id)
+                    agregarCoordCliente(conexion, cliente_id, coordX_taxi_, coordY_taxi_)
+                    actualizar_tabla_taxis(taxi_id)
                     liberar_taxi(conexion, taxi_id)
-                    taxis_estados[taxi_id].append((coordX_taxi, coordY_taxi, 1, None))
+                    taxis_estados[taxi_id].append((coordX_taxi_, coordY_taxi_, 1, None))
 
 
                     # Eliminar al cliente de la lista de clientes en trayecto
                     clientes_en_taxi_global.remove((cliente_id, destino, taxi_asignado))
                 else:
                     # Actualizar el estado del taxi para incluir al cliente en trayecto
-                    taxis_estados[taxi_id].append((coordX_taxi, coordY_taxi, 0, cliente_id))
+                    taxis_estados[taxi_id].append((coordX_taxi_, coordY_taxi_, 0, cliente_id))
 
     finally:
         conexion.close()
@@ -510,7 +596,8 @@ def actualizar_tablero(ax, destinos, clientes):
 
 
 def iniciar_central(broker):
-    imprimir_tabla()
+    imprimir_tabla_taxis()
+    imprimir_tabla_clientes()
 
     fig, ax = plt.subplots(figsize=(8, 8))
 
@@ -568,6 +655,7 @@ def autentificar_taxi(id_taxi):
     cursor.close()
     conexion.close()
 
+
 def buscar_taxi_arg(msg):
     conexion = conectar_bd()
     query = f"SELECT id FROM taxis WHERE id == {msg} AND estado IS NULL"
@@ -580,6 +668,7 @@ def buscar_taxi_arg(msg):
         return True
 
 def handle_client(conn, addr,broker):
+    conexion = conectar_bd()
     msg = conn.recv(1024).decode(FORMAT)
     if buscar_taxi_arg(msg):
         autentificar_taxi(msg)
