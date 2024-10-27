@@ -303,7 +303,7 @@ def actualizar_tabla_taxis(taxi_id):
         if destino_a_cliente is not None:  # Verificar si el taxi está registrado en la base de datos
             # Determinar el destino actual en función del estado del pasajero
             destino_actual = destino_a_cliente if pasajero == 0 else destino_a_final
-            estado_actual = f"HACIA ({'CLIENTE' if pasajero == 0 else 'DESTINO'})" if estado == 0 and pasajero == 1 else "DISPONIBLE"
+            estado_actual = f"HACIA ({'CLIENTE' if pasajero == 0 else 'DESTINO'})" if estado == 0 else "DISPONIBLE"
 
             # Verificar si el taxi ya está en la tabla
             if taxi_id in tabla_taxis['ID'].values:
@@ -546,7 +546,7 @@ def procesar_coordenadas_taxi(taxi_id, coordX_taxi_, coordY_taxi_, broker):
                     agregarCoordCliente(conexion, cliente_id, coordX_taxi_, coordY_taxi_)
                     actualizar_tabla_taxis(taxi_id)
                     liberar_taxi(conexion, taxi_id)
-                    taxis_estados[taxi_id].append((coordX_taxi_, coordY_taxi_, 1, None))
+                    #taxis_estados[taxi_id].append((coordX_taxi_, coordY_taxi_, 1, None))
 
 
                     # Eliminar al cliente de la lista de clientes en trayecto
@@ -561,14 +561,19 @@ def procesar_coordenadas_taxi(taxi_id, coordX_taxi_, coordY_taxi_, broker):
     return taxis_estados[taxi_id]  # Devolver el estado del taxi específico
 
 
+# Función para obtener la información de los taxis desde la base de datos
+def obtener_taxis_desde_bd(conexion):
+    cursor = conexion.cursor()
+    cursor.execute("SELECT id, destino_a_cliente, coordX, coordY, estado, pasajero FROM taxis")
+    taxis = cursor.fetchall()
+    return taxis  # Devuelve una lista de tuplas con los datos de cada taxi
+
+
+# Función para actualizar el tablero y mostrar taxis basados en la base de datos
 def actualizar_tablero(ax, destinos, clientes):
     # Limpiar el tablero de elementos anteriores (patches y texts)
-    
-    # Eliminar patches (rectángulos, que representan destinos y taxis)
     for patch in ax.patches[:]:
         patch.remove()
-
-    # Eliminar textos (que muestran IDs y coordenadas)
     for txt in ax.texts[:]:
         txt.remove()
 
@@ -580,19 +585,28 @@ def actualizar_tablero(ax, destinos, clientes):
     # Agregar clientes
     for cliente_id, destino, (coordX, coordY) in clientes:
         ax.add_patch(plt.Rectangle((coordX - 1, coordY - 1), 1, 1, color="yellow"))
-        ax.text(coordX - 0.5, coordY - 0.5, cliente_id, fontsize=10, ha='center', va='center', color='black')
+        ax.text(coordX - 0.5, coordY - 0.5, str(cliente_id), fontsize=10, ha='center', va='center', color='black')
 
-    # Agregar solo la última posición de cada taxi
-    for taxi_id, estados in taxis_estados.items():
-        if estados:  # Verificar que hay estados registrados
-            coordX_taxi, coordY_taxi, estado, cliente_en_taxi = estados[-1]  # Tomar solo el último estado
-            color_taxi = "red" if cliente_en_taxi is not None else "green"  # Rojo si hay un cliente en el taxi, verde si está libre
-            ax.add_patch(plt.Rectangle((coordX_taxi - 1, coordY_taxi - 1), 1, 1, color=color_taxi))
-            texto_taxi = f"{taxi_id}" if cliente_en_taxi is None else f"{taxi_id}-{cliente_en_taxi}"  # Mostrar taxi_id y cliente_id solo si el taxi lo ha recogido
-            ax.text(coordX_taxi - 0.5, coordY_taxi - 0.5, texto_taxi, fontsize=10, ha='center', va='center', color="black")
+    # Obtener los datos de cada taxi desde la base de datos
+    conexion = conectar_bd()  # Establece la conexión a la base de datos
+    taxis = obtener_taxis_desde_bd(conexion)  # Obtiene los datos de taxis
+    conexion.close()  # Cierra la conexión a la base de datos después de obtener los datos
+
+    # Agregar taxis al tablero basados en la base de datos
+    for taxi in taxis:
+        taxi_id, cliente_id, coordX_taxi, coordY_taxi, estado, cliente_en_taxi = taxi
+        color_taxi = "green" if cliente_en_taxi != 0 else "red"  # Verde si lleva un cliente, rojo si está libre
+        
+        # Si el taxi tiene un cliente, muestra "TaxiID-ClienteID"; de lo contrario, solo el ID del cliente
+        texto_taxi = f"{taxi_id}-{cliente_id}" if cliente_en_taxi != 0 else str(taxi_id)
+
+        # Representar el taxi en el tablero
+        ax.add_patch(plt.Rectangle((coordX_taxi - 1, coordY_taxi - 1), 1, 1, color=color_taxi))
+        ax.text(coordX_taxi - 0.5, coordY_taxi - 0.5, texto_taxi, fontsize=10, ha='center', va='center', color="black")
 
     plt.draw()
     plt.pause(0.01)
+
 
 
 def iniciar_central(broker):
@@ -624,14 +638,16 @@ def iniciar_central(broker):
     hilo_lector_taxis_thread = threading.Thread(target=hilo_lector_taxis, args=(broker,))
     hilo_lector_taxis_thread.start()
 
-    # Bucle principal de la interfaz gráfica (Matplotlib)
+     # Bucle principal de la interfaz gráfica (Matplotlib)
     try:
         while central_activa:
             # Procesar mensajes en la cola (coordenadas de taxis)
             while not cola_taxis.empty():
                 try:
                     taxi_id, coordX_taxi, coordY_taxi = cola_taxis.get_nowait()  # Usa get_nowait para no bloquear
-                    procesar_coordenadas_taxi(taxi_id, coordX_taxi, coordY_taxi, broker)  # No es necesario guardar aquí
+                    procesar_coordenadas_taxi(taxi_id, coordX_taxi, coordY_taxi, broker)
+                    
+                    # Actualizar tablero obteniendo información desde la base de datos
                     actualizar_tablero(ax, destinos, clientes_a_mostrar_global)
                 except Exception as e:
                     print(f"Error al procesar taxi: {e}")
@@ -669,6 +685,7 @@ def buscar_taxi_arg(msg):
 
 def handle_client(conn, addr,broker):
     conexion = conectar_bd()
+    global msg
     msg = conn.recv(1024).decode(FORMAT)
     if buscar_taxi_arg(msg):
         autentificar_taxi(msg)
