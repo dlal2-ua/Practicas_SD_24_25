@@ -17,7 +17,8 @@ CREATE TABLE IF NOT EXISTS taxis (
     destino_a_final CHAR,
     estado BOOLEAN ,
     coordX INTEGER NOT NULL,
-    coordY INTEGER NOT NULL
+    coordY INTEGER NOT NULL,
+    pasajero INTEGER NOT NULL
 
 )
 ''')
@@ -78,12 +79,12 @@ cursor.execute('''
 
 
 cursor.execute('''
-    INSERT INTO taxis (id, destino_a_cliente, destino_a_final, estado, coordX, coordY) VALUES
-    (1, NULL, NULL, NULL, 1, 1),
-    (2, NULL, NULL, NULL, 1, 1),
-    (3, NULL, NULL, NULL, 1, 1),
-    (4, NULL, NULL, NULL, 1, 1),
-    (5, NULL, NULL, NULL, 1, 1)
+    INSERT INTO taxis (id, destino_a_cliente, destino_a_final, estado, coordX, coordY, pasajero) VALUES
+    (1, NULL, NULL, NULL, 1, 1, 0),
+    (2, NULL, NULL, NULL, 1, 1, 0),
+    (3, NULL, NULL, NULL, 1, 1, 0),
+    (4, NULL, NULL, NULL, 1, 1, 0),
+    (5, NULL, NULL, NULL, 1, 1, 0)
 ''')
 
 
