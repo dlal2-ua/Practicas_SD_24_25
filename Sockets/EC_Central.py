@@ -7,7 +7,8 @@ import queue
 import pandas as pd
 import signal
 import sqlite3
-from funciones_generales import conectar_bd, coordX_taxi,coordY_taxi,nueva_pos_taxi,pasajero_dentro,pasajero_fuera
+from funciones_generales import conectar_bd, coordX_taxi,coordY_taxi,nueva_pos_taxi,pasajero_dentro,pasajero_fuera,buscar_taxi_activo
+from funciones_menu import para,reanudar
 import numpy as np
 import matplotlib.pyplot as plt
 from queue import Queue
@@ -28,6 +29,7 @@ Ventaja: Evita errores de "base de datos cerrada" y mantiene la conexión abiert
 HEADER = 64
 PORT = 6060
 FORMAT = 'utf-8'
+
 
 
 #=======================================================================================================================================================================
@@ -366,7 +368,6 @@ def hilo_enviar_coordenadas_taxi(cliente_id, taxi_id, coordX_cliente, coordY_cli
 # Función para escuchar las coordenadas de los taxis y procesar si ha llegado al cliente o destino
 def hilo_lector_taxis(broker):
     consumer = KafkaConsumer('TAXIS', bootstrap_servers=broker)
-    
     while central_activa:
         for message in consumer:
             mensaje = message.value.decode('utf-8')
@@ -377,7 +378,7 @@ def hilo_lector_taxis(broker):
                 coordY_taxi = int(partes[2])
 
                 nueva_pos_taxi(taxi_id,coordX_taxi,coordY_taxi)
-                print(f"Taxi ID: {taxi_id}, Coordenadas: ({coordX_taxi}, {coordY_taxi})")
+                #print(f"Taxi ID: {taxi_id}, Coordenadas: ({coordX_taxi}, {coordY_taxi})")
 
                 # Pasar las coordenadas procesadas al hilo principal mediante la cola
                 cola_taxis.put((taxi_id, coordX_taxi, coordY_taxi))
@@ -430,7 +431,7 @@ def procesar_coordenadas_taxi(taxi_id, coordX_taxi, coordY_taxi, broker):
                     mensaje_destino = f"{taxi_id},{coordX_cliente},{coordY_cliente},{cliente_id}"
                     producer.send('CENTRAL-TAXI', key=cliente_id.encode('utf-8'), value=mensaje_destino.encode('utf-8'))
                     producer.flush()
-                    print(f"Enviado al taxi {taxi_id} las coordenadas del destino {destino}: {coordX_destino}, {coordY_destino}.")
+                    print(f"Enviado al taxi {taxi_id} las coordenadas del destino {destino}: {coordX_destino}, {coordY_destino},{coordX_taxi(taxi_id)},{coordY_taxi(taxi_id)}")
                 
                 continue  # Continuar al siguiente cliente
 
@@ -580,6 +581,7 @@ def buscar_taxi_arg(msg):
         return True
 
 def handle_client(conn, addr,broker):
+    global msg
     msg = conn.recv(1024).decode(FORMAT)
     if buscar_taxi_arg(msg):
         autentificar_taxi(msg)
@@ -593,7 +595,7 @@ def handle_client(conn, addr,broker):
 
 def start(broker):
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    #SERVER = obtener_ip()+
+    #SERVER = obtener_ip()
     SERVER = socket.gethostbyname(socket.gethostname())
     ADDR=(SERVER,PORT)
     server.bind(ADDR)
@@ -605,6 +607,37 @@ def start(broker):
         handle_client(conn,addr,broker)
     server.close()
     print("Servidor cerrado correctamente.")
+
+def menu(broker):
+    global msg
+    while True:
+        mensaje = input()
+        print("------------MENU-----------")
+        print("a. Parar")
+        print("b. Reanudar")
+        print("c. Ir a destino")
+        print("d. Volver a la base")
+        respuesta = input()
+        if respuesta == "a":
+            print("Elige el taxi que quieres parar:")
+            t = input()
+            if buscar_taxi_activo(t):
+                para(broker,t)
+            else:
+                print(f"El taxi {t} no esta autentificado")
+        elif respuesta == "b":
+            print("Elige el taxi que quieres poner en marcha:")
+            if buscar_taxi_activo(t):
+                reanudar(broker,t)
+            else:
+                print(f"El taxi {t} no esta autentificado")
+            
+        elif respuesta == "c":
+            #ir_destino()
+            print("")
+        elif respuesta == "d":
+            #volver_base()
+            print("")
 
 
 # Función principal unificada
@@ -619,6 +652,8 @@ def main():
 
         # Crear hilo para el servidor
         hilo_servidor = threading.Thread(target=start, args=(broker,))
+        hilo_menu = threading.Thread(target=menu, args=(broker,))
+        hilo_menu.start()
         hilo_servidor.start()
 
         # Iniciar la central en el hilo principal (para evitar el problema de Matplotlib)
@@ -626,6 +661,9 @@ def main():
 
         # Esperar a que el hilo del servidor termine
         hilo_servidor.join()
+        hilo_menu.join()
+
+
     else:
         print("Los argumentos introducidos no son los correctos. El formato es: <IP gestor de colas> <puerto del broker del gestor de colas>")
 

@@ -11,67 +11,85 @@ PORT = 5050
 FORMAT = 'utf-8'
 parar_hilo_enviar_coord = False
 
-def enviar_coord(broker,):
+
+
+def enviar_central(id_taxi,broker,destinoX,destinoY,pasajero,X_taxi,Y_taxi):
     global parar_hilo_enviar_coord
     global msg_sensor
+    global Central_para
     producer = KafkaProducer(
         bootstrap_servers=broker,
     )
+    # Una vez que ha llegado, puedes manejar la lógica adicional aquí (ej: recoger el pasajero)
+    if X_taxi == destinoX and Y_taxi == destinoY:
+        print(f"Taxi {id_taxi} ha llegado al destino y ha recogido al pasajero {pasajero}.")
+        coordenada = str(id_taxi) + "," + str(X_taxi) + "," + str(Y_taxi) + "," + str(msg_sensor)
+        producer.send('TAXIS', value=coordenada.encode('utf-8'))
+        time.sleep(1)
+    else:
+        while X_taxi != destinoX and parar_hilo_enviar_coord==False and Central_para ==False:
+            if msg_sensor == "OK":
+                if destinoX > X_taxi:
+                    X_taxi += 1
+                else: 
+                    X_taxi -= 1
+                coordenada = str(id_taxi) + "," + str(X_taxi) + "," + str(Y_taxi) + "," + str(msg_sensor)
+                producer.send('TAXIS', value=coordenada.encode('utf-8'))
+                time.sleep(1)
+                while Y_taxi != destinoY and parar_hilo_enviar_coord == False and Central_para == False:
+                    if msg_sensor == "OK":
+                        if destinoY > Y_taxi:
+                            Y_taxi += 1
+                        else: 
+                            Y_taxi -= 1
+                        coordenada = str(id_taxi) + "," + str(X_taxi) + "," + str(Y_taxi) + "," + str(msg_sensor)
+                        producer.send('TAXIS', value=coordenada.encode('utf-8'))
+                        time.sleep(1)
+                    else:
+                        coordenada = str(id_taxi) + "," + str(X_taxi) + "," + str(Y_taxi) + "," + str(msg_sensor)
+                        producer.send('TAXIS', value=coordenada.encode('utf-8'))
+                        time.sleep(1)
+            else:
+                coordenada = str(id_taxi) + "," + str(X_taxi) + "," + str(Y_taxi) + "," + str(msg_sensor)
+                producer.send('TAXIS', value=coordenada.encode('utf-8'))
+                time.sleep(1)
+    producer.close()
 
+def recibir_central(broker):
+    global Central_para
     consumer= KafkaConsumer('CENTRAL-TAXI', bootstrap_servers=broker)
-    id_taxi = sys.argv[5]
+    Central_para = False
     for message in consumer:
         # Decodificar el mensaje recibido del taxi
         mensaje = message.value.decode('utf-8')
-        
-        # Extraer el ID del taxi y sus coordenadas
-        try:
-            partes = mensaje.split(",")
-            taxi = int(partes[0])
-            if taxi == int(id_taxi) :
-                destinoX = int(partes[1])  
+        id_taxi = sys.argv[5]
+        partes = mensaje.split(",")
+        taxi = int(partes[0])
+        destinoX = partes[1]
+        if int(id_taxi) == taxi:
+            if destinoX == "Parar":
+                Central_para = True
+            elif destinoX== "Seguir":
+                Central_para = False
+            else:
+                destinoX = int(destinoX)
                 destinoY = int(partes[2])
                 pasajero = partes[3]
                 X_taxi = int(partes[4])
-                Y_taxi = int(partes[5])
-                # Una vez que ha llegado, puedes manejar la lógica adicional aquí (ej: recoger el pasajero)
-                if X_taxi == destinoX and Y_taxi == destinoY:
-                    print(f"Taxi {id_taxi} ha llegado al destino y ha recogido al pasajero {pasajero}.")
-                    coordenada = str(id_taxi) + "," + str(X_taxi) + "," + str(Y_taxi) + "," + str(msg_sensor)
-                    producer.send('TAXIS', value=coordenada.encode('utf-8'))
-                    time.sleep(1)
-                else:
-                    #pasajero_dentro(taxi,pasajero)
-                    while X_taxi != destinoX and parar_hilo_enviar_coord==False:
-                        if msg_sensor == "OK":
-                            if destinoX > X_taxi:
-                                X_taxi += 1
-                            else: 
-                                X_taxi -= 1
-                            coordenada = str(id_taxi) + "," + str(X_taxi) + "," + str(Y_taxi) + "," + str(msg_sensor)
-                            producer.send('TAXIS', value=coordenada.encode('utf-8'))
-                            time.sleep(1)
-                            while Y_taxi != destinoY and parar_hilo_enviar_coord == False:
-                                if msg_sensor == "OK":
-                                    if destinoY > Y_taxi:
-                                        Y_taxi += 1
-                                    else: 
-                                        Y_taxi -= 1
-                                    coordenada = str(id_taxi) + "," + str(X_taxi) + "," + str(Y_taxi) + "," + str(msg_sensor)
-                                    producer.send('TAXIS', value=coordenada.encode('utf-8'))
-                                    time.sleep(1)
-                                else:
-                                    coordenada = str(id_taxi) + "," + str(X_taxi) + "," + str(Y_taxi) + "," + str(msg_sensor)
-                                    producer.send('TAXIS', value=coordenada.encode('utf-8'))
-                                    time.sleep(1)
-                        else:
-                            coordenada = str(id_taxi) + "," + str(X_taxi) + "," + str(Y_taxi) + "," + str(msg_sensor)
-                            producer.send('TAXIS', value=coordenada.encode('utf-8'))
-                            time.sleep(1)
-        except IndexError:
-            print(f"Error procesando el mensaje del taxi: {mensaje}")
-            continue
-    producer.close()
+                Y_taxi = int(partes[5]) 
+            hilo_enviar_a_central = threading.Thread(target=enviar_central, args=(id_taxi,broker,destinoX,destinoY,pasajero,X_taxi,Y_taxi,))
+            hilo_enviar_a_central.start()
+
+
+def enviar_coord(broker,):
+
+    hilo_recibir_central = threading.Thread(target=recibir_central,args=(broker,))
+    hilo_recibir_central.start()
+    hilo_recibir_central.join()
+
+    
+        
+
         
 
 #Función cliente con la central
@@ -130,7 +148,7 @@ def start(broker):
                 hilo_enviar_coord.start()
                 while msg_sensor:
                     msg_sensor = conn.recv(1024).decode('utf-8')
-                    print(msg_sensor)
+                    #print(msg_sensor)
                 conn.close()
                 hilo_enviar_coord.join()
 
