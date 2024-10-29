@@ -89,6 +89,7 @@ def manejar_cierre(signal, frame):
     print("\nSeñal de cierre recibida. Procesando mensajes pendientes...")
     central_activa = False
     server_active = False
+    sys.exit(0)  # Salir inmediatamente de todo el programa
 
 
 # Función para imprimir la tabla de clientes solo si hay datos
@@ -498,8 +499,8 @@ def iniciar_central(broker):
     except Exception as e:
         print(f"Ocurrió un error en el bucle principal: {e}")
     finally:
-        exit(0)  # Salir del programa después de cerrar la ventana de Matplotlib
-        print("Central cerrada correctamente.")
+        print("Cerrando central...")
+        sys.exit(0)  # Salir inmediatamente de todo el programa
 
 
 
@@ -538,34 +539,37 @@ def start(broker):
 
 def menu(broker):
     global msg
-    while True:
-        mensaje = input()
-        print("------------MENU-----------")
-        print("a. Parar")
-        print("b. Reanudar")
-        print("c. Ir a destino")
-        print("d. Volver a la base")
-        respuesta = input()
-        if respuesta == "a":
-            print("Elige el taxi que quieres parar:")
-            t = input()
-            if buscar_taxi_activo(t):
-                para(broker,t)
-            else:
-                print(f"El taxi {t} no esta autentificado")
-        elif respuesta == "b":
-            print("Elige el taxi que quieres poner en marcha:")
-            if buscar_taxi_activo(t):
-                reanudar(broker,t)
-            else:
-                print(f"El taxi {t} no esta autentificado")
-            
-        elif respuesta == "c":
-            #ir_destino()
-            print("")
-        elif respuesta == "d":
-            #volver_base()
-            print("")
+    try:
+        while True:
+            mensaje = input()
+            print("------------MENU-----------")
+            print("a. Parar")
+            print("b. Reanudar")
+            print("c. Ir a destino")
+            print("d. Volver a la base")
+            respuesta = input()
+            if respuesta == "a":
+                print("Elige el taxi que quieres parar:")
+                t = input()
+                if buscar_taxi_activo(t):
+                    para(broker,t)
+                else:
+                    print(f"El taxi {t} no esta autentificado")
+            elif respuesta == "b":
+                print("Elige el taxi que quieres poner en marcha:")
+                if buscar_taxi_activo(t):
+                    reanudar(broker,t)
+                else:
+                    print(f"El taxi {t} no esta autentificado")
+                
+            elif respuesta == "c":
+                #ir_destino()
+                print("")
+            elif respuesta == "d":
+                #volver_base()
+                print("")
+    except Exception as e:
+        ()
 
 
 # Función principal unificada
@@ -578,19 +582,22 @@ def main():
         # Registrar la señal SIGINT para manejarla en el hilo principal
         signal.signal(signal.SIGINT, manejar_cierre)
 
-        # Crear hilo para el servidor
-        hilo_servidor = threading.Thread(target=start, args=(broker,))
-        hilo_menu = threading.Thread(target=menu, args=(broker,))
-        hilo_menu.start()
-        hilo_servidor.start()
+        try:
+            # Crear hilo para el servidor
+            hilo_servidor = threading.Thread(target=start, args=(broker,))
+            hilo_menu = threading.Thread(target=menu, args=(broker,))
+            hilo_menu.start()
+            hilo_servidor.start()
 
-        # Iniciar la central en el hilo principal (para evitar el problema de Matplotlib)
-        iniciar_central(broker)
+            # Iniciar la central en el hilo principal (para evitar el problema de Matplotlib)
+            iniciar_central(broker)
 
-        # Esperar a que el hilo del servidor termine
-        hilo_servidor.join()
-        hilo_menu.join()
-
+            # Esperar a que el hilo del servidor termine
+            hilo_servidor.join()
+            hilo_menu.join()
+        except Exception as e:
+            print(f"Cerrar central: {e}")
+            exit(1)
 
     else:
         print("Los argumentos introducidos no son los correctos. El formato es: <IP gestor de colas> <puerto del broker del gestor de colas>")

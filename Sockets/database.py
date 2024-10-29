@@ -57,7 +57,7 @@ CREATE TABLE IF NOT EXISTS destinos(
 
 cursor.execute('''
     INSERT INTO pos_inicial_cliente (id, coordX, coordY) VALUES 
-    ('a', 10, 10),
+    ('a', 11, 9),
     ('b', 20, 20),
     ('c', 15, 15),
     ('d', 3, 3),
