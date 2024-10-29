@@ -36,7 +36,7 @@ def coordY_taxi(id_taxi):
 def sacar_taxi(id_taxi):
     conexion = conectar_bd()
     cursor = conexion.cursor()
-    cursor.execute(f"UPDATE taxis SET estado = NULL, destino_a_cliente = NULL, destino_a_final = NULL, coordX = 1, coordY = 1 WHERE id = {id_taxi}")
+    cursor.execute(f"UPDATE taxis SET estado = NULL, destino_a_cliente = NULL, destino_a_final = NULL, coordX = 1, coordY = 1, pasajero = 0 WHERE id = {id_taxi}")
     conexion.commit()
     cursor.close()
     conexion.close()
@@ -58,7 +58,7 @@ def pasajero_fuera(id_taxi):
     conexion.close()
 def buscar_taxi_activo(msg):
     conexion = conectar_bd()
-    query = f"SELECT id FROM taxis WHERE id == {msg} AND estado==0 or estado==1"
+    query = f"SELECT id FROM taxis WHERE id == {msg} AND (estado = 0 or estado = 1)"
     df_busqueda = pd.read_sql_query(query,conexion)
     if df_busqueda.empty:
         conexion.close()
@@ -86,9 +86,44 @@ def buscar_taxi_arg(msg):
     else:
         conexion.close()
         return True
-    
+def obtener_cliente(id):
+    conexion = conectar_bd()
+    cursor = conexion.cursor()
+    cursor.execute(f"SELECT destino_a_cliente FROM taxis WHERE id = {id}")
+    pasajero = cursor.fetchone()
+    cursor.close()
+    conexion.close()
+    return pasajero
+def existe_pasajero(id):
+    conexion = conectar_bd()
+    cursor = conexion.cursor()
+    cursor.execute("SELECT pasajero FROM taxis WHERE id = ?", (id,))
+    resultado = cursor.fetchone()
+    if resultado is not None:
+        return resultado[0] == 1
+    return False
 
-
+def obtener_destino_final_de_taxi(taxi_id):
+    conexion = conectar_bd()
+    cursor = conexion.cursor()
+    cursor.execute(f"SELECT destino_a_final FROM taxis WHERE id = {taxi_id}")
+    destino = cursor.fetchone()
+    cursor.close()
+    conexion.close()
+    return destino
+def obtener_destinos_bien():
+    conexion = conectar_bd()
+    query = "SELECT destino FROM destinos"
+    cursor = conexion.cursor()
+    cursor.execute(query)
+    resultados = cursor.fetchall()
+    cursor.close()
+    destinos = [fila[0] for fila in resultados]
+    return destinos
+def existe_destino(destino):
+    conexion = conectar_bd()
+    destinos = obtener_destinos_bien(conexion)
+    print(destinos)
 ###================== FUNCIONES DE BASE DE DATOS ==================###
 
 # Función para obtener destinos desde la base de datos
@@ -249,3 +284,4 @@ def obtener_taxis_desde_bd(conexion):
 
 ###===========================================================================
 ###===========================================================================
+
