@@ -8,7 +8,7 @@ import pandas as pd
 import signal
 import sqlite3
 from funciones_generales import *
-from funciones_menu import para,reanudar
+from funciones_menu import *
 import numpy as np
 import matplotlib.pyplot as plt
 from queue import Queue
@@ -275,7 +275,7 @@ def hilo_enviar_coordenadas_taxi(cliente_id, taxi_id, coordX_cliente, coordY_cli
     producer = KafkaProducer(bootstrap_servers=broker)
 
     # Preparar el mensaje con las coordenadas del cliente
-    mensaje_coordenadas = f"{taxi_id},{coordX_cliente},{coordY_cliente},{cliente_id},{coordX_taxi(taxi_id)},{coordY_taxi(taxi_id)}"
+    mensaje_coordenadas = f"{taxi_id},{coordX_cliente},{coordY_cliente},{cliente_id},{coordX_taxi(taxi_id)},{coordY_taxi(taxi_id)},nada"
     
     # Enviar mensaje al taxi a través del tópico 'CENTRAL-TAXI'
     producer.send('CENTRAL-TAXI', key=str(taxi_id).encode('utf-8'), value=mensaje_coordenadas.encode('utf-8'))
@@ -358,7 +358,7 @@ def procesar_coordenadas_taxi(taxi_id, coordX_taxi_, coordY_taxi_, broker):
                 destino_coords = obtener_destino_coords(conexion, destino)
                 if destino_coords:
                     coordX_destino, coordY_destino = destino_coords
-                    mensaje_destino = f"{taxi_id},{coordX_destino},{coordY_destino},{cliente_id}, {coordX_taxi_},{coordY_taxi_}"
+                    mensaje_destino = f"{taxi_id},{coordX_destino},{coordY_destino},{cliente_id}, {coordX_taxi_},{coordY_taxi_},nada"
                     producer.send('CENTRAL-TAXI', key=cliente_id.encode('utf-8'), value=mensaje_destino.encode('utf-8'))
                     producer.flush()
                     print(f"Enviado al taxi {taxi_id} las coordenadas del destino {destino}: {coordX_destino}, {coordY_destino},{coordX_taxi(taxi_id)},{coordY_taxi(taxi_id)}")
@@ -548,21 +548,26 @@ def menu(broker):
         respuesta = input()
         if respuesta == "a":
             print("Elige el taxi que quieres parar:")
-            t = input()
-            if buscar_taxi_activo(t):
-                para(broker,t)
+            t1 = input()
+            if buscar_taxi_activo(t1):
+                para(broker,t1,coordX_taxi(t1),coordY_taxi(t1),obtener_cliente(t1))
             else:
-                print(f"El taxi {t} no esta autentificado")
+                print(f"El taxi {t1} no esta autentificado")
         elif respuesta == "b":
             print("Elige el taxi que quieres poner en marcha:")
-            if buscar_taxi_activo(t):
-                reanudar(broker,t)
+            t2 = input()
+            if buscar_taxi_activo(t2):
+                reanudar(broker,t2,coordX_taxi(t2),coordY_taxi(t2),obtener_cliente(t2))
             else:
-                print(f"El taxi {t} no esta autentificado")
+                print(f"El taxi {t2} no esta autentificado")
             
         elif respuesta == "c":
-            #ir_destino()
-            print("")
+            print("Elige el taxi que quieres cambiar el destino")
+            t3 = input()
+            if buscar_taxi_activo(t3):
+                ir_destino(t3)
+            else:
+                print(f"El taxi {t3} no esta disponible")
         elif respuesta == "d":
             #volver_base()
             print("")
