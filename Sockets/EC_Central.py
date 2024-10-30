@@ -316,6 +316,15 @@ def hilo_lector_taxis(broker):
                 taxi_id = int(partes[0])
                 coordX_taxi = int(partes[1])
                 coordY_taxi = int(partes[2])
+                sensor = partes[3]
+                central = partes[4]
+                if sensor == "OK":
+                    if central == "parado":
+                        central_para_taxi(taxi_id)
+                    if central == "sigue":
+                        central_sigue_taxi(taxi_id)
+                else:
+                    parado_sensor(taxi_id)
 
                 nueva_pos_taxi(taxi_id,coordX_taxi,coordY_taxi)
                 actualizar_tabla_taxis(taxi_id)
@@ -567,14 +576,14 @@ def menu(broker):
             if respuesta == "a":
                 print("Elige el taxi que quieres parar:")
                 t1 = input()
-                if buscar_taxi_activo(t1):
+                if buscar_taxi_activo(int(t1)):
                     para(broker,t1,coordX_taxi(t1),coordY_taxi(t1),obtener_cliente(t1))
                 else:
                     print(f"El taxi {t1} no esta autentificado")
             elif respuesta == "b":
                 print("Elige el taxi que quieres poner en marcha:")
                 t2 = input()
-                if buscar_taxi_activo(t2):
+                if buscar_taxi_activo(int(t2)):
                     reanudar(broker,t2,coordX_taxi(t2),coordY_taxi(t2),obtener_cliente(t2))
                 else:
                     print(f"El taxi {t2} no esta autentificado")
@@ -582,15 +591,16 @@ def menu(broker):
             elif respuesta == "c":
                 print("Elige el taxi que quieres cambiar el destino")
                 t3 = input()
-                if buscar_taxi_activo(t3):
-                    ir_destino(t3)
+                
+                if buscar_taxi_activo(int(t3)):
+                    ir_destino(broker,t3,coordX_taxi(t3),coordY_taxi(t3),obtener_cliente(t3))
                 else:
                     print(f"El taxi {t3} no esta disponible")
             elif respuesta == "d":
                 #volver_base()
                 print("")
-    except Exception as e:
-        exit(1)
+    except OSError:
+        print("Tienes que poner un numero en el taxi")
 
 
 # Función principal unificada

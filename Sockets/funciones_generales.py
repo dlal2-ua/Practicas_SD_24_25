@@ -58,7 +58,7 @@ def pasajero_fuera(id_taxi):
     conexion.close()
 def buscar_taxi_activo(msg):
     conexion = conectar_bd()
-    query = f"SELECT id FROM taxis WHERE id == {msg} AND (estado = 0 or estado = 1)"
+    query = f"SELECT id FROM taxis WHERE id == {msg} AND (estado = 0 or estado = 1 or estado = 2 or estado = 3)"
     df_busqueda = pd.read_sql_query(query,conexion)
     if df_busqueda.empty:
         conexion.close()
@@ -93,7 +93,7 @@ def obtener_cliente(id):
     pasajero = cursor.fetchone()
     cursor.close()
     conexion.close()
-    return pasajero
+    return pasajero[0]
 def existe_pasajero(id):
     conexion = conectar_bd()
     cursor = conexion.cursor()
@@ -121,9 +121,51 @@ def obtener_destinos_bien():
     destinos = [fila[0] for fila in resultados]
     return destinos
 def existe_destino(destino):
+    destinos = obtener_destinos_bien()
+    existe = False
+    for d in destinos:
+        if d == destino:
+            existe = True
+    return existe
+def hay_pasajero(taxi_id):
     conexion = conectar_bd()
-    destinos = obtener_destinos_bien(conexion)
-    print(destinos)
+    cursor = conexion.cursor()
+    cursor.execute(f"SELECT pasajero FROM taxis WHERE id = {taxi_id}")
+    pasajero = cursor.fetchone()
+    cursor.close()
+    conexion.close()
+    if pasajero == 1:
+        return True
+    else:
+        return False
+def cambiar_destino(taxi_id,destino):
+    conexion = conectar_bd()
+    cursor = conexion.cursor()
+    cursor.execute(f"UPDATE taxis SET destino_a_final = {destino} WHERE id = {taxi_id}")
+    conexion.commit()
+    cursor.close()
+    conexion.close()
+def central_para_taxi(taxi):
+    conexion = conectar_bd()
+    cursor = conexion.cursor()
+    cursor.execute(f"UPDATE taxis SET estado = 3 WHERE id = {taxi}")
+    conexion.commit()
+    cursor.close()
+    conexion.close()
+def central_sigue_taxi(taxi):
+    conexion = conectar_bd()
+    cursor = conexion.cursor()
+    cursor.execute(f"UPDATE taxis SET estado = 0 WHERE id = {taxi}")
+    conexion.commit()
+    cursor.close()
+    conexion.close()
+def parado_sensor(taxi):
+    conexion = conectar_bd()
+    cursor = conexion.cursor()
+    cursor.execute(f"UPDATE taxis SET estado = 2 WHERE id = {taxi}")
+    conexion.commit()
+    cursor.close()
+    conexion.close()
 ###================== FUNCIONES DE BASE DE DATOS ==================###
 
 # Función para obtener destinos desde la base de datos
@@ -302,4 +344,3 @@ def taxi_siguiente_servicio_tabla(conexion, taxi_id):
 
 ###===========================================================================
 ###===========================================================================
-
