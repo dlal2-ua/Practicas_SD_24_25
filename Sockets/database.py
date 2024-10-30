@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS taxis (
     id INTEGER PRIMARY KEY,
     destino_a_cliente CHAR,
     destino_a_final CHAR,
-    estado BOOLEAN ,
+    estado INTEGER ,
     coordX INTEGER NOT NULL,
     coordY INTEGER NOT NULL,
     pasajero INTEGER NOT NULL
