@@ -34,7 +34,7 @@ def enviar_central(id_taxi,broker,pasajero):
             print(f"Taxi {id_taxi} ha llegado al destino y ha recogido al pasajero {pasajero}.")
             coordenada = str(id_taxi) + "," + str(X_taxi) + "," + str(Y_taxi) + "," + str(msg_sensor)
             producer.send('TAXIS', value=coordenada.encode('utf-8'))
-            mensaje_cliente = f"ID:{pasajero} IN"
+            mensaje_cliente = f"ID:{pasajero} OK"
             producercliente.send('TAXI-CLIENTE',value=mensaje_cliente.encode('utf-8'))
             time.sleep(1)
 

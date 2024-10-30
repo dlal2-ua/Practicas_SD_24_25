@@ -150,9 +150,13 @@ def actualizar_tabla_taxis(taxi_id):
     with lock_taxis:
         destino_a_cliente, destino_a_final, estado, coordX, coordY, pasajero = obtener_datos_taxi(conexion, taxi_id)
 
-        if destino_a_cliente is not None:  # Verificar si el taxi está registrado en la base de datos
+        if taxi_id is not None:  # Verificar si el taxi está registrado en la base de datos
             # Determinar el destino actual en función del estado del pasajero
-            destino_actual = destino_a_cliente if pasajero == 0 else destino_a_final
+            if destino_a_cliente is None:
+                destino_actual = "-"
+            else:
+                destino_actual = destino_a_cliente if pasajero == 0 else destino_a_final
+
             estado_actual = f"HACIA ({'CLIENTE' if pasajero == 0 else 'DESTINO'})" if estado == 0 else "DISPONIBLE"
 
             # Verificar si el taxi ya está en la tabla
@@ -211,7 +215,18 @@ def hilo_lector_cliente(broker, cola_mensajes):
                 partes = mensaje.split()
                 cliente_id = partes[1].strip("'")  # Extraer ID del cliente sin las comillas
                 destino = partes[-1]  # El último valor es el destino
-
+                
+                
+                # Verificar si el cliente ya está en servicio en la base de datos
+                if cliente_en_servicio(conexion, cliente_id):  # Asume que devuelve True si el cliente está en servicio
+                    # Enviar mensaje de "YA_ESTAS_EN_SERVICIO" al cliente
+                    mensaje_servicio_activo = "YA_ESTAS_EN_SERVICIO"
+                    producer.send('CENTRAL-CLIENTE', key=cliente_id.encode('utf-8'), value=mensaje_servicio_activo.encode('utf-8'))
+                    producer.flush()
+                    print(f"Cliente {cliente_id} ya está en servicio. Mensaje enviado al cliente.")
+                    continue  # No procesar más solicitudes para este cliente
+                
+            
                 if (buscarCliente(conexion, cliente_id) == False):
                     # Abre la conexión a la base de datos para agregar el cliente
                     agregarCliente(conexion, cliente_id, destino, "EN ESPERA", 0, 0)
@@ -393,6 +408,7 @@ def procesar_coordenadas_taxi(taxi_id, coordX_taxi_, coordY_taxi_, broker):
                     # Liberar el taxi
                     bajar_pasajero(conexion, taxi_id)
                     agregarCoordCliente(conexion, cliente_id, coordX_taxi_, coordY_taxi_)
+                    taxi_siguiente_servicio_tabla(conexion, taxi_id)
                     actualizar_tabla_taxis(taxi_id)
                     liberar_taxi(conexion, taxi_id)
                     #taxis_estados[taxi_id].append((coordX_taxi_, coordY_taxi_, 1, None))
@@ -539,39 +555,42 @@ def start(broker):
 
 def menu(broker):
     global msg
-    while True:
-        mensaje = input()
-        print("------------MENU-----------")
-        print("a. Parar")
-        print("b. Reanudar")
-        print("c. Ir a destino")
-        print("d. Volver a la base")
-        respuesta = input()
-        if respuesta == "a":
-            print("Elige el taxi que quieres parar:")
-            t1 = input()
-            if buscar_taxi_activo(t1):
-                para(broker,t1,coordX_taxi(t1),coordY_taxi(t1),obtener_cliente(t1))
-            else:
-                print(f"El taxi {t1} no esta autentificado")
-        elif respuesta == "b":
-            print("Elige el taxi que quieres poner en marcha:")
-            t2 = input()
-            if buscar_taxi_activo(t2):
-                reanudar(broker,t2,coordX_taxi(t2),coordY_taxi(t2),obtener_cliente(t2))
-            else:
-                print(f"El taxi {t2} no esta autentificado")
-            
-        elif respuesta == "c":
-            print("Elige el taxi que quieres cambiar el destino")
-            t3 = input()
-            if buscar_taxi_activo(t3):
-                ir_destino(t3)
-            else:
-                print(f"El taxi {t3} no esta disponible")
-        elif respuesta == "d":
-            #volver_base()
-            print("")
+    try:
+        while True:
+            mensaje = input()
+            print("------------MENU-----------")
+            print("a. Parar")
+            print("b. Reanudar")
+            print("c. Ir a destino")
+            print("d. Volver a la base")
+            respuesta = input()
+            if respuesta == "a":
+                print("Elige el taxi que quieres parar:")
+                t1 = input()
+                if buscar_taxi_activo(t1):
+                    para(broker,t1,coordX_taxi(t1),coordY_taxi(t1),obtener_cliente(t1))
+                else:
+                    print(f"El taxi {t1} no esta autentificado")
+            elif respuesta == "b":
+                print("Elige el taxi que quieres poner en marcha:")
+                t2 = input()
+                if buscar_taxi_activo(t2):
+                    reanudar(broker,t2,coordX_taxi(t2),coordY_taxi(t2),obtener_cliente(t2))
+                else:
+                    print(f"El taxi {t2} no esta autentificado")
+                
+            elif respuesta == "c":
+                print("Elige el taxi que quieres cambiar el destino")
+                t3 = input()
+                if buscar_taxi_activo(t3):
+                    ir_destino(t3)
+                else:
+                    print(f"El taxi {t3} no esta disponible")
+            elif respuesta == "d":
+                #volver_base()
+                print("")
+    except Exception as e:
+        exit(1)
 
 
 # Función principal unificada
