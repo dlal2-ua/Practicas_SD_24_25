@@ -158,7 +158,6 @@ def enviar_destinos_kafka(broker, cliente_id, destinos_cliente):
                     raise KafkaException(msg.error())
 
                 mensaje = msg.value().decode('utf-8')
-                print(mensaje)
                 
                 # Si el mensaje indica que el cliente ya está en servicio
                 if mensaje == "YA_ESTAS_EN_SERVICIO":
@@ -181,6 +180,7 @@ def enviar_destinos_kafka(broker, cliente_id, destinos_cliente):
                 time.sleep(1)
 
         # Esperar confirmación de recogida (IN) o continuar si se recibió "KO"
+        no_entrar = False
         contador_sin_respuesta = 0
         tiempo_ultimo_mensaje = time.time()
         while not salir_programa:
@@ -206,18 +206,21 @@ def enviar_destinos_kafka(broker, cliente_id, destinos_cliente):
                 print(Fore.GREEN + f"Confirmación recibida: Cliente recogido por {taxi_asignado}, yendo a {destino}")
                 print()
                 print(f"Esperando confirmación de recogida por el {taxi_asignado}...")
+                print()
                 mensaje_enviado = True
                 break
 
             if mensaje == f"ID:{cliente_id} KO":
                 print(Fore.RED + f"Error: Fracaso en la recogida del cliente '{cliente_id}' por {taxi_asignado}.")
-                print(Fore.GREEN + "Saliendo de este destino y continuando con el siguiente...\n")
+                print(Fore.YELLOW + "Saliendo de este destino y continuando con el siguiente...\n")
+                print()
+                no_entrar = True
                 break
 
         # Procesar confirmación de llegada (OK)
         contador_sin_respuesta = 0
         tiempo_ultimo_mensaje = time.time()
-        while not salir_programa:
+        while not salir_programa and no_entrar == False:
             msg = consumer.poll(timeout=1.0)
             if msg is None:
                 if time.time() - tiempo_ultimo_mensaje >= 40:
@@ -243,7 +246,8 @@ def enviar_destinos_kafka(broker, cliente_id, destinos_cliente):
 
             if mensaje == f"ID:{cliente_id} KO":
                 print(Fore.RED + f"Error: Fracaso en la llegada del cliente '{cliente_id}' a {destino}.")
-                print(Fore.GREEN + "Saliendo de este destino y continuando con el siguiente...\n")
+                print(Fore.YELLOW + "Saliendo de este destino y continuando con el siguiente...\n")
+                print()
                 break
 
         # Si no es el último destino, esperar 4 segundos antes de procesar el siguiente destino

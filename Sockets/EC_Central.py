@@ -12,6 +12,7 @@ from funciones_menu import *
 import numpy as np
 import matplotlib.pyplot as plt
 from queue import Queue
+import os
 
 """
 En Python, no se puede manejr señales (como SIGINT o SIGTERM) en hilos secundarios.
@@ -89,7 +90,8 @@ def manejar_cierre(signal, frame):
     print("\nSeñal de cierre recibida. Procesando mensajes pendientes...")
     central_activa = False
     server_active = False
-    sys.exit(0)  # Salir inmediatamente de todo el programa
+    os._exit(0)  # Salir inmediatamente de todo el programa sin limpieza
+    os.kill(0, signal.SIGKILL)  # Forzar la terminación de todos los procesos secundarios
 
 
 # Función para imprimir la tabla de clientes solo si hay datos
@@ -525,7 +527,10 @@ def iniciar_central(broker):
         print(f"Ocurrió un error en el bucle principal: {e}")
     finally:
         print("Cerrando central...")
-        sys.exit(0)  # Salir inmediatamente de todo el programa
+        os._exit(0)  # Forzar la salida sin limpieza
+        os.kill(0, signal.SIGKILL)  # Forzar la terminación de todos los procesos secundarios
+
+
 
 
 
@@ -601,7 +606,8 @@ def menu(broker):
                 print("")
     except OSError:
         print("Tienes que poner un numero en el taxi")
-
+    except EOFError:
+        os._exit(1)  # Forzar la salida en caso de error
 
 # Función principal unificada
 def main():
