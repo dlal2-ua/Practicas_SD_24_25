@@ -12,6 +12,8 @@ from funciones_menu import *
 import numpy as np
 import matplotlib.pyplot as plt
 from queue import Queue
+import os
+from colorama import Fore, init
 
 """
 En Python, no se puede manejr señales (como SIGINT o SIGTERM) en hilos secundarios.
@@ -37,7 +39,8 @@ FORMAT = 'utf-8'
 
 
 
-
+# Inicializar colorama (solo es necesario en Windows)
+init(autoreset=True)
 
 # Inicializar una tabla (DataFrame) con las columnas ID, DESTINO, ESTADO
 tabla_cliente = pd.DataFrame(columns=["ID", "DESTINO", "ESTADO"])
@@ -89,6 +92,8 @@ def manejar_cierre(signal, frame):
     print("\nSeñal de cierre recibida. Procesando mensajes pendientes...")
     central_activa = False
     server_active = False
+    os._exit(0)  # Salir inmediatamente de todo el programa sin limpieza
+    os.kill(0, signal.SIGKILL)  # Forzar la terminación de todos los procesos secundarios
 
 
 # Función para imprimir la tabla de clientes solo si hay datos
@@ -149,11 +154,19 @@ def actualizar_tabla_taxis(taxi_id):
     with lock_taxis:
         destino_a_cliente, destino_a_final, estado, coordX, coordY, pasajero = obtener_datos_taxi(conexion, taxi_id)
 
-        if destino_a_cliente is not None:  # Verificar si el taxi está registrado en la base de datos
+        if taxi_id is not None:  # Verificar si el taxi está registrado en la base de datos
             # Determinar el destino actual en función del estado del pasajero
-            destino_actual = destino_a_cliente if pasajero == 0 else destino_a_final
-            estado_actual = f"HACIA ({'CLIENTE' if pasajero == 0 else 'DESTINO'})" if estado == 0 else "DISPONIBLE"
+            if destino_a_cliente is None:
+                destino_actual = "-"
+            else:
+                destino_actual = destino_a_cliente if pasajero == 0 else destino_a_final
 
+            estado_actual = (
+                f"HACIA ({'CLIENTE' if pasajero == 0 else 'DESTINO'})" if estado == 0 else
+                "DISPONIBLE" if estado == 1 else
+                "PARADO"
+            )
+            
             # Verificar si el taxi ya está en la tabla
             if taxi_id in tabla_taxis['ID'].values:
                 # Actualizar los datos en la tabla
@@ -210,7 +223,18 @@ def hilo_lector_cliente(broker, cola_mensajes):
                 partes = mensaje.split()
                 cliente_id = partes[1].strip("'")  # Extraer ID del cliente sin las comillas
                 destino = partes[-1]  # El último valor es el destino
-
+                
+                
+                # Verificar si el cliente ya está en servicio en la base de datos
+                if cliente_en_servicio(conexion, cliente_id):  # Asume que devuelve True si el cliente está en servicio
+                    # Enviar mensaje de "YA_ESTAS_EN_SERVICIO" al cliente
+                    mensaje_servicio_activo = "YA_ESTAS_EN_SERVICIO"
+                    producer.send('CENTRAL-CLIENTE', key=cliente_id.encode('utf-8'), value=mensaje_servicio_activo.encode('utf-8'))
+                    producer.flush()
+                    print(f"Cliente {cliente_id} ya está en servicio. Mensaje enviado al cliente.")
+                    continue  # No procesar más solicitudes para este cliente
+                
+            
                 if (buscarCliente(conexion, cliente_id) == False):
                     # Abre la conexión a la base de datos para agregar el cliente
                     agregarCliente(conexion, cliente_id, destino, "EN ESPERA", 0, 0)
@@ -401,6 +425,7 @@ def procesar_coordenadas_taxi(taxi_id, coordX_taxi_, coordY_taxi_, broker):
                     # Liberar el taxi
                     bajar_pasajero(conexion, taxi_id)
                     agregarCoordCliente(conexion, cliente_id, coordX_taxi_, coordY_taxi_)
+                    taxi_siguiente_servicio_tabla(conexion, taxi_id)
                     actualizar_tabla_taxis(taxi_id)
                     liberar_taxi(conexion, taxi_id)
                     #taxis_estados[taxi_id].append((coordX_taxi_, coordY_taxi_, 1, None))
@@ -446,10 +471,25 @@ def actualizar_tablero(ax, destinos, clientes):
     # Agregar taxis al tablero basados en la base de datos
     for taxi in taxis:
         taxi_id, cliente_id, coordX_taxi, coordY_taxi, estado, cliente_en_taxi = taxi
-        color_taxi = "green" if cliente_en_taxi != 0 else "red"  # Verde si lleva un cliente, rojo si está libre
-        
+
+        #color_taxi = "green" if cliente_en_taxi != 0 else "red"  # Verde si lleva un cliente, rojo si está libre
         # Si el taxi tiene un cliente, muestra "TaxiID-ClienteID"; de lo contrario, solo el ID del cliente
+        #texto_taxi = f"{taxi_id}-{cliente_id}" if cliente_en_taxi != 0 else str(taxi_id)
+
+        color_taxi = "red"  #Rojo color base si esta a NULL
+
+        # Definir color según el estado del taxi
+        if estado == 0:
+            color_taxi = "green"  # Estado 0: taxi en verde
+        elif estado in [1, 2]:
+            color_taxi = "red"    # Estado 1 o 2: taxi en rojo
+        elif estado == 3:
+            color_taxi = "red"    # Estado 3: taxi en rojo y añadir exclamación en el nombre
+
+        # Actualizar el texto del taxi, con exclamación si el estado es 3
         texto_taxi = f"{taxi_id}-{cliente_id}" if cliente_en_taxi != 0 else str(taxi_id)
+        if estado == 3:
+            texto_taxi += "!"  # Añadir exclamación al nombre del taxi en estado 3
 
         # Representar el taxi en el tablero
         ax.add_patch(plt.Rectangle((coordX_taxi - 1, coordY_taxi - 1), 1, 1, color=color_taxi))
@@ -507,8 +547,11 @@ def iniciar_central(broker):
     except Exception as e:
         print(f"Ocurrió un error en el bucle principal: {e}")
     finally:
-        exit(0)  # Salir del programa después de cerrar la ventana de Matplotlib
-        print("Central cerrada correctamente.")
+        print("Cerrando central...")
+        os._exit(0)  # Forzar la salida sin limpieza
+        os.kill(0, signal.SIGKILL)  # Forzar la terminación de todos los procesos secundarios
+
+
 
 
 
@@ -550,11 +593,11 @@ def menu(broker):
     try:
         while True:
             mensaje = input()
-            print("------------MENU-----------")
-            print("a. Parar")
-            print("b. Reanudar")
-            print("c. Ir a destino")
-            print("d. Volver a la base")
+            print(Fore.LIGHTMAGENTA_EX + "------------MENU-----------")
+            print(Fore.LIGHTMAGENTA_EX +"a. Parar")
+            print(Fore.LIGHTMAGENTA_EX +"b. Reanudar")
+            print(Fore.LIGHTMAGENTA_EX +"c. Ir a destino")
+            print(Fore.LIGHTMAGENTA_EX +"d. Volver a la base")
             respuesta = input()
             if respuesta == "a":
                 print("Elige el taxi que quieres parar:")
@@ -584,7 +627,8 @@ def menu(broker):
                 print("")
     except OSError:
         print("Tienes que poner un numero en el taxi")
-
+    except EOFError:
+        os._exit(1)  # Forzar la salida en caso de error
 
 # Función principal unificada
 def main():
@@ -596,19 +640,22 @@ def main():
         # Registrar la señal SIGINT para manejarla en el hilo principal
         signal.signal(signal.SIGINT, manejar_cierre)
 
-        # Crear hilo para el servidor
-        hilo_servidor = threading.Thread(target=start, args=(broker,))
-        hilo_menu = threading.Thread(target=menu, args=(broker,))
-        hilo_menu.start()
-        hilo_servidor.start()
+        try:
+            # Crear hilo para el servidor
+            hilo_servidor = threading.Thread(target=start, args=(broker,))
+            hilo_menu = threading.Thread(target=menu, args=(broker,))
+            hilo_menu.start()
+            hilo_servidor.start()
 
-        # Iniciar la central en el hilo principal (para evitar el problema de Matplotlib)
-        iniciar_central(broker)
+            # Iniciar la central en el hilo principal (para evitar el problema de Matplotlib)
+            iniciar_central(broker)
 
-        # Esperar a que el hilo del servidor termine
-        hilo_servidor.join()
-        hilo_menu.join()
-
+            # Esperar a que el hilo del servidor termine
+            hilo_servidor.join()
+            hilo_menu.join()
+        except Exception as e:
+            print(f"Cerrar central: {e}")
+            exit(1)
 
     else:
         print("Los argumentos introducidos no son los correctos. El formato es: <IP gestor de colas> <puerto del broker del gestor de colas>")

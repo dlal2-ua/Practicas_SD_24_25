@@ -62,11 +62,12 @@ def verificar_central_activa(producer, consumer, cliente_id):
     mensaje_central_activa = "Central activa?"
     while not salir_programa:
         print(Fore.YELLOW + "Verificando si la central está activa...")
+        print()
         producer.produce('CLIENTES', key=cliente_id, value=mensaje_central_activa)
         producer.flush()
 
         tiempo_inicio = time.time()
-        while time.time() - tiempo_inicio < 5 and not salir_programa:
+        while time.time() - tiempo_inicio < 15 and not salir_programa:
             msg = consumer.poll(timeout=1.0)
             if msg is None:
                 continue
@@ -100,11 +101,12 @@ def enviar_destinos_kafka(broker, cliente_id, destinos_cliente):
     consumer = Consumer({
         'bootstrap.servers': broker,
         'group.id': f'grupo_consumidor_{cliente_id}',
-        'auto.offset.reset': 'earliest'
+        'auto.offset.reset': 'latest'
     })
 
-    topic_cliente = 'CENTRAL-CLIENTE'
-    consumer.subscribe([topic_cliente])
+    topic_cliente = ['CENTRAL-CLIENTE', 'TAXI-CLIENTE']
+    consumer.subscribe(topic_cliente)
+
 
     # Verificar si la central está activa antes de proceder
     if not verificar_central_activa(producer, consumer, cliente_id):
@@ -115,7 +117,11 @@ def enviar_destinos_kafka(broker, cliente_id, destinos_cliente):
         if salir_programa:
             break
 
+
+
+
         mensaje_enviado = False
+        contador_sin_respuesta = 0  # Contador de veces que no se recibe confirmación
 
         while not mensaje_enviado and not salir_programa:
             # Enviar el destino
@@ -129,16 +135,36 @@ def enviar_destinos_kafka(broker, cliente_id, destinos_cliente):
 
             # Esperar asignación de taxi (ASIGNADO)
             tiempo_inicio = time.time()
+            tiempo_ultimo_mensaje = time.time()  # Inicializar el temporizador para el mensaje de espera
 
-            while time.time() - tiempo_inicio < 50 and not salir_programa:
+            while time.time() - tiempo_inicio < 15 and not salir_programa:
                 msg = consumer.poll(timeout=1.0)
                 if msg is None:
+                    # Cada 10 segundos, imprime un mensaje de espera
+                    if time.time() - tiempo_ultimo_mensaje >= 20:
+                        contador_sin_respuesta += 1
+                        print("No se recibió mensaje, esperando asignación de taxi...")
+                        print()
+                        tiempo_ultimo_mensaje = time.time()  # Reiniciar el temporizador de mensaje
+
+                    # Si no se recibe respuesta después de 3 intentos, pasar al siguiente destino
+                    if contador_sin_respuesta >= 3:
+                        print(Fore.YELLOW + f"No se recibió confirmación después de 3 intentos para el destino {destino}. Pasando al siguiente destino...\n")
+                        mensaje_enviado = True
+                        break
                     continue
 
                 if msg.error():
                     raise KafkaException(msg.error())
 
                 mensaje = msg.value().decode('utf-8')
+                
+                # Si el mensaje indica que el cliente ya está en servicio
+                if mensaje == "YA_ESTAS_EN_SERVICIO":
+                    print(Fore.RED + f"El cliente {cliente_id} ya está en un servicio. No se puede solicitar otro servicio.")
+                    salir_programa = True  # Cierra el terminal del cliente
+                    break
+                
 
                 if f"ID:{cliente_id} ASIGNADO" in mensaje:
                     taxi_asignado = mensaje.split('TAXI:')[1]  # Extraer el taxi asignado
@@ -146,17 +172,30 @@ def enviar_destinos_kafka(broker, cliente_id, destinos_cliente):
                     print(Fore.GREEN + f"Confirmación recibida: Taxi {taxi_asignado} asignado")
                     print()
                     print(f"Esperando confirmación de recogida por el {taxi_asignado}...")
+                    print()
                     mensaje_enviado = True
                     break
 
             if not mensaje_enviado:
-                print(Fore.YELLOW + "No se recibió confirmación en 10 segundos. Reintentando...\n")
-                time.sleep(10)
+                print(Fore.YELLOW + "No se recibió confirmación en 5 segundos. Reintentando...\n")
+                time.sleep(1)
 
         # Esperar confirmación de recogida (IN) o continuar si se recibió "KO"
+        no_entrar = False
+        contador_sin_respuesta = 0
+        tiempo_ultimo_mensaje = time.time()
         while not salir_programa:
             msg = consumer.poll(timeout=1.0)
             if msg is None:
+                if time.time() - tiempo_ultimo_mensaje >= 40:
+                    contador_sin_respuesta += 1
+                    print("No se recibió mensaje, esperando confirmación de recogida...")
+                    print()
+                    tiempo_ultimo_mensaje = time.time()
+
+                if contador_sin_respuesta >= 3:
+                    print(Fore.YELLOW + f"No se recibió confirmación de recogida después de 3 intentos para el destino {destino}. Pasando al siguiente destino...\n")
+                    break
                 continue
 
             if msg.error():
@@ -167,17 +206,33 @@ def enviar_destinos_kafka(broker, cliente_id, destinos_cliente):
             if mensaje == f"ID:{cliente_id} IN":
                 print(Fore.GREEN + f"Confirmación recibida: Cliente recogido por {taxi_asignado}, yendo a {destino}")
                 print()
+                print(f"Esperando confirmación de recogida por el {taxi_asignado}...")
+                print()
+                mensaje_enviado = True
                 break
 
             if mensaje == f"ID:{cliente_id} KO":
                 print(Fore.RED + f"Error: Fracaso en la recogida del cliente '{cliente_id}' por {taxi_asignado}.")
-                print(Fore.GREEN + "Saliendo de este destino y continuando con el siguiente...\n")
+                print(Fore.YELLOW + "Saliendo de este destino y continuando con el siguiente...\n")
+                print()
+                no_entrar = True
                 break
 
         # Procesar confirmación de llegada (OK)
-        while not salir_programa:
+        contador_sin_respuesta = 0
+        tiempo_ultimo_mensaje = time.time()
+        while not salir_programa and no_entrar == False:
             msg = consumer.poll(timeout=1.0)
             if msg is None:
+                if time.time() - tiempo_ultimo_mensaje >= 40:
+                    contador_sin_respuesta += 1
+                    print("No se recibió mensaje, esperando confirmación de llegada al destino...")
+                    print()
+                    tiempo_ultimo_mensaje = time.time()
+
+                if contador_sin_respuesta >= 3:
+                    print(Fore.YELLOW + f"No se recibió confirmación de llegada después de 3 intentos para el destino {destino}. Pasando al siguiente destino...\n")
+                    break
                 continue
 
             if msg.error():
@@ -192,7 +247,8 @@ def enviar_destinos_kafka(broker, cliente_id, destinos_cliente):
 
             if mensaje == f"ID:{cliente_id} KO":
                 print(Fore.RED + f"Error: Fracaso en la llegada del cliente '{cliente_id}' a {destino}.")
-                print(Fore.GREEN + "Saliendo de este destino y continuando con el siguiente...\n")
+                print(Fore.YELLOW + "Saliendo de este destino y continuando con el siguiente...\n")
+                print()
                 break
 
         # Si no es el último destino, esperar 4 segundos antes de procesar el siguiente destino
@@ -202,8 +258,6 @@ def enviar_destinos_kafka(broker, cliente_id, destinos_cliente):
             time.sleep(4)
 
     consumer.close()
-
-
 
 
 

@@ -35,7 +35,7 @@ def enviar_central(id_taxi,broker,pasajero):
             print(f"Taxi {id_taxi} ha llegado al destino y ha recogido al pasajero {pasajero}.")
             coordenada = str(id_taxi) + "," + str(X_taxi) + "," + str(Y_taxi) + "," + str(msg_sensor)+ ",nada"
             producer.send('TAXIS', value=coordenada.encode('utf-8'))
-            mensaje_cliente = f"ID:{pasajero} IN"
+            mensaje_cliente = f"ID:{pasajero} OK"
             producercliente.send('TAXI-CLIENTE',value=mensaje_cliente.encode('utf-8'))
             time.sleep(1)
 
@@ -190,27 +190,72 @@ def start(broker):
             parar_hilo_enviar_coord = True
             
 
+# Función para dibujar el mapa en la terminal
+def dibujar_mapa(tamano=20):
+    # Crear el mapa como una matriz de caracteres vacíos
+    mapa = [["." for _ in range(tamano)] for _ in range(tamano)]
+    
+    # Marcar la posición del destino
+    mapa[destinoY][destinoX] = "D"  # 'D' para destino
+    
+    # Marcar la posición actual del taxi
+    mapa[Y_taxi][X_taxi] = "T"  # 'T' para taxi
+    
+    # Mostrar el mapa
+    print("\n" * 2)  # Espaciado adicional para facilitar visualización
+    for fila in mapa:
+        print(" ".join(fila))
+    print(f"\nTaxi en: ({X_taxi}, {Y_taxi}), Destino en: ({destinoX}, {destinoY})\n")
+
+
+# Simulación del movimiento del taxi hacia el destino
+def mover_taxi():
+    global X_taxi, Y_taxi
+    while X_taxi != destinoX or Y_taxi != destinoY:
+        # Movimiento en eje X
+        if X_taxi < destinoX:
+            X_taxi += 1
+        elif X_taxi > destinoX:
+            X_taxi -= 1
+
+        # Movimiento en eje Y
+        if Y_taxi < destinoY:
+            Y_taxi += 1
+        elif Y_taxi > destinoY:
+            Y_taxi -= 1
+
+        # Dibujar el mapa en cada paso del movimiento
+        dibujar_mapa()
+        time.sleep(0.5)  # Pausa para visualizar el movimiento
+
+    print("El taxi ha llegado al destino!")
+
 
 
 
 #MAIN
 
-if (len(sys.argv)==6):
-    try:
-        SERVER_CLIENT = sys.argv[1]
-        PORT_CLIENT = int(sys.argv[2])
-        ip_broker = sys.argv[3]
-        puerto_broker = sys.argv[4]
-        broker = f'{ip_broker}:{puerto_broker}'
-        ADDR_CLIENT = (SERVER_CLIENT,PORT_CLIENT)
-        hilo_servidor = threading.Thread(target= servidor(broker))
-        hilo_servidor.start()
-    except KeyboardInterrupt:
-        producercliente = KafkaProducer( bootstrap_servers=broker,)
-        mensaje_cliente = f"ID:{obtener_cliente(sys.argv[5])} KO"
-        producercliente.send('TAXI-CLIENTE',value=mensaje_cliente.encode('utf-8'))
-        sacar_taxi(int(sys.argv[5]))
-        exit(1)
+if __name__ == "__main__":
 
-else:
-    print("Los argumentos son:<Ip del EC_Central><Puerto del EC_Central><Ip del broker><Puerto del broker><ID del taxi>")
+    if (len(sys.argv)==6):
+        try:
+            SERVER_CLIENT = sys.argv[1]
+            PORT_CLIENT = int(sys.argv[2])
+            ip_broker = sys.argv[3]
+            puerto_broker = sys.argv[4]
+            broker = f'{ip_broker}:{puerto_broker}'
+            ADDR_CLIENT = (SERVER_CLIENT,PORT_CLIENT)
+            hilo_servidor = threading.Thread(target= servidor(broker))
+            hilo_servidor.start()
+            # Iniciar el movimiento del taxi
+            mover_taxi()
+        except KeyboardInterrupt:
+            producercliente = KafkaProducer( bootstrap_servers=broker,)
+            mensaje_cliente = f"ID:{obtener_cliente(sys.argv[5])} KO"
+            producercliente.send('TAXI-CLIENTE',value=mensaje_cliente.encode('utf-8'))
+            sacar_taxi(int(sys.argv[5]))
+            exit(1)
+    
+
+    else:
+        print("Los argumentos son:<Ip del EC_Central><Puerto del EC_Central><Ip del broker><Puerto del broker><ID del taxi>")

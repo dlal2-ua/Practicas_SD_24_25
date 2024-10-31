@@ -323,6 +323,24 @@ def obtener_taxis_desde_bd(conexion):
     return taxis  # Devuelve una lista de tuplas con los datos de cada taxi
 
 
+def cliente_en_servicio(conexion, cliente_id):
+    cursor = conexion.cursor()
+    cursor.execute("""
+        SELECT COUNT(*) 
+        FROM taxis 
+        WHERE destino_a_cliente = ? AND estado = 0
+    """, (cliente_id,))
+    
+    # Si COUNT(*) es mayor que 0, significa que existe al menos un taxi con esas condiciones
+    resultado = cursor.fetchone()[0] > 0
+    return resultado
+
+
+def taxi_siguiente_servicio_tabla(conexion, taxi_id):
+    cursor = conexion.cursor()
+    cursor.execute("UPDATE taxis SET destino_a_cliente = NULL, destino_a_final = NULL WHERE id = ?", (taxi_id,))
+    conexion.commit()  # Asegurar que los cambios se guarden en la base de datos
+
 
 ###===========================================================================
 ###===========================================================================
