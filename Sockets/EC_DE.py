@@ -84,8 +84,8 @@ def enviar_central(id_taxi,broker,pasajero):
                     # Actualizar el mapa cada vez que se envían coordenadas
                     dibujar_mapa()
 
-    except TypeError:
-        print("No hace nada")
+    except KeyboardInterrupt:
+        exit(1)
     producer.close()
 
 def recibir_central(broker):

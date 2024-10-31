@@ -426,8 +426,9 @@ def procesar_coordenadas_taxi(taxi_id, coordX_taxi_, coordY_taxi_, broker):
                     bajar_pasajero(conexion, taxi_id)
                     agregarCoordCliente(conexion, cliente_id, coordX_taxi_, coordY_taxi_)
                     taxi_siguiente_servicio_tabla(conexion, taxi_id)
-                    actualizar_tabla_taxis(taxi_id)
                     liberar_taxi(conexion, taxi_id)
+                    actualizar_tabla_taxis(taxi_id)
+                    
                     #taxis_estados[taxi_id].append((coordX_taxi_, coordY_taxi_, 1, None))
 
 
