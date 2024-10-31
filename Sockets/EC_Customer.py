@@ -172,6 +172,7 @@ def enviar_destinos_kafka(broker, cliente_id, destinos_cliente):
                     print(Fore.GREEN + f"Confirmación recibida: Taxi {taxi_asignado} asignado")
                     print()
                     print(f"Esperando confirmación de recogida por el {taxi_asignado}...")
+                    print()
                     mensaje_enviado = True
                     break
 

@@ -35,6 +35,9 @@ if(len(sys.argv)==3):
     #Si el puerto que se ha puesto no lo tiene ningún DE
     except ConnectionRefusedError:
         print("Este puerto no pertenece a ningún DE. Prueba con el siguiente")
+    except KeyboardInterrupt:
+        client.close()
+        raise SystemExit(1)
 else:
     print("Los argumentos introducidos no son los correctos.El formato es: <IP> <Puerto del EC_DE>")
 

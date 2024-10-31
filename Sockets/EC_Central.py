@@ -161,8 +161,12 @@ def actualizar_tabla_taxis(taxi_id):
             else:
                 destino_actual = destino_a_cliente if pasajero == 0 else destino_a_final
 
-            estado_actual = f"HACIA ({'CLIENTE' if pasajero == 0 else 'DESTINO'})" if estado == 0 else "DISPONIBLE"
-
+            estado_actual = (
+                f"HACIA ({'CLIENTE' if pasajero == 0 else 'DESTINO'})" if estado == 0 else
+                "DISPONIBLE" if estado == 1 else
+                "PARADO"
+            )
+            
             # Verificar si el taxi ya está en la tabla
             if taxi_id in tabla_taxis['ID'].values:
                 # Actualizar los datos en la tabla
@@ -473,7 +477,7 @@ def actualizar_tablero(ax, destinos, clientes):
         #texto_taxi = f"{taxi_id}-{cliente_id}" if cliente_en_taxi != 0 else str(taxi_id)
 
         color_taxi = "red"  #Rojo color base si esta a NULL
-        
+
         # Definir color según el estado del taxi
         if estado == 0:
             color_taxi = "green"  # Estado 0: taxi en verde
