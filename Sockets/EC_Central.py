@@ -428,7 +428,7 @@ def procesar_coordenadas_taxi(taxi_id, coordX_taxi_, coordY_taxi_, broker):
                     taxi_siguiente_servicio_tabla(conexion, taxi_id)
                     liberar_taxi(conexion, taxi_id)
                     actualizar_tabla_taxis(taxi_id)
-                    
+
                     #taxis_estados[taxi_id].append((coordX_taxi_, coordY_taxi_, 1, None))
 
 
@@ -472,10 +472,6 @@ def actualizar_tablero(ax, destinos, clientes):
     # Agregar taxis al tablero basados en la base de datos
     for taxi in taxis:
         taxi_id, cliente_id, coordX_taxi, coordY_taxi, estado, cliente_en_taxi = taxi
-
-        #color_taxi = "green" if cliente_en_taxi != 0 else "red"  # Verde si lleva un cliente, rojo si está libre
-        # Si el taxi tiene un cliente, muestra "TaxiID-ClienteID"; de lo contrario, solo el ID del cliente
-        #texto_taxi = f"{taxi_id}-{cliente_id}" if cliente_en_taxi != 0 else str(taxi_id)
 
         color_taxi = "red"  #Rojo color base si esta a NULL
 
