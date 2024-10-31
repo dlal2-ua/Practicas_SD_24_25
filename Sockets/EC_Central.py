@@ -88,7 +88,10 @@ def obtener_ip():
 
 # Manejador de la señal SIGINT para cerrar la central limpiamente
 def manejar_cierre(signal, frame):
-    global central_activa, server_active
+    global central_activa, server_active,broker
+    producer = KafkaProducer(bootstrap_servers=broker)
+    mensaje_confirmacion = "Central caida"
+    producer.send('CENTRAL-CAIDA', value=mensaje_confirmacion.encode('utf-8'))
     print("\nSeñal de cierre recibida. Procesando mensajes pendientes...")
     central_activa = False
     server_active = False
@@ -614,17 +617,24 @@ def menu(broker):
             elif respuesta == "c":
                 print("Elige el taxi que quieres cambiar el destino")
                 t3 = input()
-                
                 if buscar_taxi_activo(int(t3)):
                     ir_destino(broker,t3,coordX_taxi(t3),coordY_taxi(t3),obtener_cliente(t3))
                 else:
                     print(f"El taxi {t3} no esta disponible")
             elif respuesta == "d":
-                #volver_base()
-                print("")
+                print("Elige el taxi que quieres que vuelva a base")
+                t4 = input()
+                if buscar_taxi_activo(int(t4)):
+                    volver_base(broker,t4,coordX_taxi(t4),coordY_taxi(t4),obtener_cliente(t4))
+                else:
+                    print(f"El taxi {t4} no esta disponible")
     except OSError:
         print("Tienes que poner un numero en el taxi")
     except EOFError:
+        producer = KafkaProducer(bootstrap_servers=broker)
+        mensaje_confirmacion = "Central caida"
+        producer.send('CENTRAL-CAIDA', value=mensaje_confirmacion.encode('utf-8'))
+        producer.flush()
         os._exit(1)  # Forzar la salida en caso de error
 
 # Función principal unificada
@@ -632,6 +642,7 @@ def main():
     if len(sys.argv) == 3:
         ip_broker = sys.argv[1]
         puerto_broker = sys.argv[2]
+        global broker
         broker = f'{ip_broker}:{puerto_broker}'
 
         # Registrar la señal SIGINT para manejarla en el hilo principal
