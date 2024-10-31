@@ -13,6 +13,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from queue import Queue
 import os
+from colorama import Fore, init
 
 """
 En Python, no se puede manejr señales (como SIGINT o SIGTERM) en hilos secundarios.
@@ -38,7 +39,8 @@ FORMAT = 'utf-8'
 
 
 
-
+# Inicializar colorama (solo es necesario en Windows)
+init(autoreset=True)
 
 # Inicializar una tabla (DataFrame) con las columnas ID, DESTINO, ESTADO
 tabla_cliente = pd.DataFrame(columns=["ID", "DESTINO", "ESTADO"])
@@ -465,10 +467,25 @@ def actualizar_tablero(ax, destinos, clientes):
     # Agregar taxis al tablero basados en la base de datos
     for taxi in taxis:
         taxi_id, cliente_id, coordX_taxi, coordY_taxi, estado, cliente_en_taxi = taxi
-        color_taxi = "green" if cliente_en_taxi != 0 else "red"  # Verde si lleva un cliente, rojo si está libre
-        
+
+        #color_taxi = "green" if cliente_en_taxi != 0 else "red"  # Verde si lleva un cliente, rojo si está libre
         # Si el taxi tiene un cliente, muestra "TaxiID-ClienteID"; de lo contrario, solo el ID del cliente
+        #texto_taxi = f"{taxi_id}-{cliente_id}" if cliente_en_taxi != 0 else str(taxi_id)
+
+        color_taxi = "red"  #Rojo color base si esta a NULL
+        
+        # Definir color según el estado del taxi
+        if estado == 0:
+            color_taxi = "green"  # Estado 0: taxi en verde
+        elif estado in [1, 2]:
+            color_taxi = "red"    # Estado 1 o 2: taxi en rojo
+        elif estado == 3:
+            color_taxi = "red"    # Estado 3: taxi en rojo y añadir exclamación en el nombre
+
+        # Actualizar el texto del taxi, con exclamación si el estado es 3
         texto_taxi = f"{taxi_id}-{cliente_id}" if cliente_en_taxi != 0 else str(taxi_id)
+        if estado == 3:
+            texto_taxi += "!"  # Añadir exclamación al nombre del taxi en estado 3
 
         # Representar el taxi en el tablero
         ax.add_patch(plt.Rectangle((coordX_taxi - 1, coordY_taxi - 1), 1, 1, color=color_taxi))
@@ -572,11 +589,11 @@ def menu(broker):
     try:
         while True:
             mensaje = input()
-            print("------------MENU-----------")
-            print("a. Parar")
-            print("b. Reanudar")
-            print("c. Ir a destino")
-            print("d. Volver a la base")
+            print(Fore.LIGHTMAGENTA_EX + "------------MENU-----------")
+            print(Fore.LIGHTMAGENTA_EX +"a. Parar")
+            print(Fore.LIGHTMAGENTA_EX +"b. Reanudar")
+            print(Fore.LIGHTMAGENTA_EX +"c. Ir a destino")
+            print(Fore.LIGHTMAGENTA_EX +"d. Volver a la base")
             respuesta = input()
             if respuesta == "a":
                 print("Elige el taxi que quieres parar:")
