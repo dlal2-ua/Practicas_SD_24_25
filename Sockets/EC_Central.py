@@ -329,7 +329,7 @@ def hilo_lector_taxis(broker):
                 if sensor == "OK":
                     if central == "parado":
                         central_para_taxi(taxi_id)
-                    if central == "sigue":
+                    else:
                         central_sigue_taxi(taxi_id)
                 else:
                     parado_sensor(taxi_id)

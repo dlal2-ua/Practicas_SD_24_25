@@ -141,7 +141,7 @@ def hay_pasajero(taxi_id):
 def cambiar_destino(taxi_id,destino):
     conexion = conectar_bd()
     cursor = conexion.cursor()
-    cursor.execute(f"UPDATE taxis SET destino_a_final = {destino} WHERE id = {taxi_id}")
+    cursor.execute(f"UPDATE taxis SET destino_a_final = ? WHERE id = ?",(destino,taxi_id))
     conexion.commit()
     cursor.close()
     conexion.close()
