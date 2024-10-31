@@ -68,8 +68,8 @@ def enviar_central(id_taxi,broker,pasajero):
                     coordenada = str(id_taxi) + "," + str(X_taxi) + "," + str(Y_taxi) + "," + str(msg_sensor) + ",nada"
                     producer.send('TAXIS', value=coordenada.encode('utf-8'))
                     time.sleep(1)
-    except TypeError:
-        print("No hace nada")
+    except KeyboardInterrupt:
+        exit(1)
     producer.close()
 
 def recibir_central(broker):
