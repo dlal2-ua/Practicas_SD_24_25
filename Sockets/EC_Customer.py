@@ -159,12 +159,13 @@ def enviar_destinos_kafka(broker, cliente_id, destinos_cliente):
 
                 mensaje = msg.value().decode('utf-8')
                 
+                """
                 # Si el mensaje indica que el cliente ya está en servicio
                 if mensaje == "YA_ESTAS_EN_SERVICIO":
                     print(Fore.RED + f"El cliente {cliente_id} ya está en un servicio. No se puede solicitar otro servicio.")
                     salir_programa = True  # Cierra el terminal del cliente
                     break
-                
+                """
 
                 if f"ID:{cliente_id} ASIGNADO" in mensaje:
                     taxi_asignado = mensaje.split('TAXI:')[1]  # Extraer el taxi asignado

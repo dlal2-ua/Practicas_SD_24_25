@@ -27,8 +27,10 @@ def enviar_central(id_taxi,broker,pasajero):
     producer = KafkaProducer(
         bootstrap_servers=broker,
     )
+
     # Una vez que ha llegado, puedes manejar la lógica adicional aquí (ej: recoger el pasajero)
     print(f"Antes de entrar al bucle: {X_taxi} , {Y_taxi}")
+    # Iniciar el movimiento del taxi
 
     try:
         if X_taxi == destinoX and Y_taxi == destinoY:
@@ -39,6 +41,8 @@ def enviar_central(id_taxi,broker,pasajero):
             producercliente.send('TAXI-CLIENTE',value=mensaje_cliente.encode('utf-8'))
             time.sleep(1)
 
+            # Actualizar el mapa cada vez que se envían coordenadas
+            dibujar_mapa()
         else:
             while X_taxi != destinoX and parar_hilo_enviar_coord==False and Central_para ==False:
                 print(f"En el bucle: {X_taxi} , {Y_taxi}")
@@ -50,6 +54,9 @@ def enviar_central(id_taxi,broker,pasajero):
                     coordenada = str(id_taxi) + "," + str(X_taxi) + "," + str(Y_taxi) + "," + str(msg_sensor)+ ",nada"
                     producer.send('TAXIS', value=coordenada.encode('utf-8'))
                     time.sleep(1)
+                    # Actualizar el mapa cada vez que se envían coordenadas
+                    dibujar_mapa()
+
                     while Y_taxi != destinoY and parar_hilo_enviar_coord == False and Central_para == False:
                         print(f"En el bucle: {X_taxi} , {Y_taxi}")
                         if msg_sensor == "OK":
@@ -60,14 +67,23 @@ def enviar_central(id_taxi,broker,pasajero):
                             coordenada = str(id_taxi) + "," + str(X_taxi) + "," + str(Y_taxi) + "," + str(msg_sensor)+ ",nada"
                             producer.send('TAXIS', value=coordenada.encode('utf-8'))
                             time.sleep(1)
+                            # Actualizar el mapa cada vez que se envían coordenadas
+                            dibujar_mapa()
+
                         else:
                             coordenada = str(id_taxi) + "," + str(X_taxi) + "," + str(Y_taxi) + "," + str(msg_sensor)+ ",nada"
                             producer.send('TAXIS', value=coordenada.encode('utf-8'))
                             time.sleep(1)
+                            # Actualizar el mapa cada vez que se envían coordenadas
+                            dibujar_mapa()
+
                 else:
                     coordenada = str(id_taxi) + "," + str(X_taxi) + "," + str(Y_taxi) + "," + str(msg_sensor) + ",nada"
                     producer.send('TAXIS', value=coordenada.encode('utf-8'))
                     time.sleep(1)
+                    # Actualizar el mapa cada vez que se envían coordenadas
+                    dibujar_mapa()
+
     except TypeError:
         print("No hace nada")
     producer.close()
@@ -191,7 +207,7 @@ def start(broker):
             
 
 # Función para dibujar el mapa en la terminal
-def dibujar_mapa(tamano=20):
+def dibujar_mapa(tamano=21):
     # Crear el mapa como una matriz de caracteres vacíos
     mapa = [["." for _ in range(tamano)] for _ in range(tamano)]
     
@@ -226,7 +242,6 @@ def mover_taxi():
 
         # Dibujar el mapa en cada paso del movimiento
         dibujar_mapa()
-        time.sleep(0.5)  # Pausa para visualizar el movimiento
 
     print("El taxi ha llegado al destino!")
 
@@ -247,8 +262,6 @@ if __name__ == "__main__":
             ADDR_CLIENT = (SERVER_CLIENT,PORT_CLIENT)
             hilo_servidor = threading.Thread(target= servidor(broker))
             hilo_servidor.start()
-            # Iniciar el movimiento del taxi
-            mover_taxi()
         except KeyboardInterrupt:
             producercliente = KafkaProducer( bootstrap_servers=broker,)
             mensaje_cliente = f"ID:{obtener_cliente(sys.argv[5])} KO"

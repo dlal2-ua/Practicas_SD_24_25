@@ -162,8 +162,8 @@ def actualizar_tabla_taxis(taxi_id):
                 destino_actual = destino_a_cliente if pasajero == 0 else destino_a_final
 
             estado_actual = (
+                "DISPONIBLE" if estado == 1 and destino_a_cliente is None else
                 f"HACIA ({'CLIENTE' if pasajero == 0 else 'DESTINO'})" if estado == 0 else
-                "DISPONIBLE" if estado == 1 else
                 "PARADO"
             )
             
@@ -224,7 +224,7 @@ def hilo_lector_cliente(broker, cola_mensajes):
                 cliente_id = partes[1].strip("'")  # Extraer ID del cliente sin las comillas
                 destino = partes[-1]  # El último valor es el destino
                 
-                
+                """
                 # Verificar si el cliente ya está en servicio en la base de datos
                 if cliente_en_servicio(conexion, cliente_id):  # Asume que devuelve True si el cliente está en servicio
                     # Enviar mensaje de "YA_ESTAS_EN_SERVICIO" al cliente
@@ -233,7 +233,7 @@ def hilo_lector_cliente(broker, cola_mensajes):
                     producer.flush()
                     print(f"Cliente {cliente_id} ya está en servicio. Mensaje enviado al cliente.")
                     continue  # No procesar más solicitudes para este cliente
-                
+                """
             
                 if (buscarCliente(conexion, cliente_id) == False):
                     # Abre la conexión a la base de datos para agregar el cliente
