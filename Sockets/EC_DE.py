@@ -200,6 +200,7 @@ def start(broker):
     ADDR=(SERVER,PORT)
     server.bind(ADDR)
     print(f"Puerto en el que está escuchando: {PORT}")
+    print(f"Servidor escuchando en {SERVER}")
     server.listen()
 
     while True:
