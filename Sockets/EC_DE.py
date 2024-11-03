@@ -45,8 +45,8 @@ def enviar_central(id_taxi,broker,pasajero):
             # Actualizar el mapa cada vez que se envían coordenadas
             dibujar_mapa()
         else:
-            while X_taxi != destinoX and parar_hilo_enviar_coord==False and Central_para ==False:
-                #print(f"En el bucle: {X_taxi} , {Y_taxi}")
+            while (X_taxi != destinoX or Y_taxi != destinoY) and parar_hilo_enviar_coord==False and Central_para ==False:
+                print(f"En el bucle: {X_taxi} , {Y_taxi}")
                 if msg_sensor == "OK":
                     if destinoX > X_taxi:
                         X_taxi += 1
@@ -200,6 +200,7 @@ def start(broker):
     ADDR=(SERVER,PORT)
     server.bind(ADDR)
     print(f"Puerto en el que está escuchando: {PORT}")
+    print(f"Servidor escuchando en {SERVER}")
     server.listen()
 
     while True:

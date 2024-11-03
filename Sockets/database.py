@@ -57,22 +57,25 @@ CREATE TABLE IF NOT EXISTS destinos(
 
 cursor.execute('''
     INSERT INTO pos_inicial_cliente (id, coordX, coordY) VALUES 
-    ('a', 11, 9),
-    ('b', 20, 20),
-    ('c', 15, 15),
-    ('d', 3, 3),
-    ('e', 6, 20)
+    ('a', 2, 6),
+    ('b', 4, 8),
+    ('c', 7, 11),
+    ('d', 2, 17),
+    ('e', 5, 13)
 ''')
 
 
 cursor.execute('''
     INSERT INTO destinos (destino, coordX, coordY) VALUES
-    ('H', 15, 19),
-    ('N', 1, 20),
-    ('X', 6, 6),
-    ('U', 16, 11),
-    ('L', 9, 9),
-    ('T', 18, 3)
+    ('H', 10, 5),
+    ('N', 14, 5),
+    ('X', 18, 5),
+    ('U', 10, 10),
+    ('L', 14, 10),
+    ('T', 18, 10),
+    ('Y', 10, 15),
+    ('Z', 14, 15),
+    ('W', 18, 15)
 ''')
 
 
