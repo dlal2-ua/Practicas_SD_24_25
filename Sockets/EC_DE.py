@@ -30,7 +30,7 @@ def enviar_central(id_taxi,broker,pasajero):
     )
 
     # Una vez que ha llegado, puedes manejar la lógica adicional aquí (ej: recoger el pasajero)
-    print(f"Antes de entrar al bucle: {X_taxi} , {Y_taxi}")
+    #print(f"Antes de entrar al bucle: {X_taxi} , {Y_taxi}")
     # Iniciar el movimiento del taxi
 
     try:
@@ -46,7 +46,7 @@ def enviar_central(id_taxi,broker,pasajero):
             dibujar_mapa()
         else:
             while X_taxi != destinoX and parar_hilo_enviar_coord==False and Central_para ==False:
-                print(f"En el bucle: {X_taxi} , {Y_taxi}")
+                #print(f"En el bucle: {X_taxi} , {Y_taxi}")
                 if msg_sensor == "OK":
                     if destinoX > X_taxi:
                         X_taxi += 1
@@ -59,7 +59,7 @@ def enviar_central(id_taxi,broker,pasajero):
                     dibujar_mapa()
 
                     while Y_taxi != destinoY and parar_hilo_enviar_coord == False and Central_para == False:
-                        print(f"En el bucle: {X_taxi} , {Y_taxi}")
+                        #print(f"En el bucle: {X_taxi} , {Y_taxi}")
                         if msg_sensor == "OK":
                             if destinoY > Y_taxi:
                                 Y_taxi += 1
@@ -113,7 +113,7 @@ def recibir_central(broker):
                 taxi = int(partes[0])
                 central = partes[6]
                 if int(id_taxi) == taxi:
-                    print(mensaje)
+                    #print(mensaje)
                     if central == "Parar":
                         Central_para = True
                         coordenada = str(id_taxi) + "," + str(X_taxi) + "," + str(Y_taxi) + "," + str(msg_sensor) + ",parado"
