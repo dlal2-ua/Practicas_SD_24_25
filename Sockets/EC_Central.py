@@ -121,7 +121,7 @@ def actualizar_tabla(cliente_id, destino):
         if cliente_id in tabla_cliente['ID'].values:
             # Actualizar el destino y estado del cliente existente
             tabla_cliente.loc[tabla_cliente['ID'] == cliente_id, ['DESTINO', 'ESTADO']] = [destino, 'EN ESPERA']
-            print(f"\nActualización: Cliente {cliente_id} actualizado con destino {destino}. Estado: EN ESPERA.")
+            #print(f"\nActualización: Cliente {cliente_id} actualizado con destino {destino}. Estado: EN ESPERA.")
         else:
             # Agregar un nuevo cliente a la tabla si no existe
             nueva_fila = pd.DataFrame({
@@ -130,7 +130,7 @@ def actualizar_tabla(cliente_id, destino):
                 "ESTADO": ["EN ESPERA"]
             })
             tabla_cliente = pd.concat([tabla_cliente, nueva_fila], ignore_index=True)
-            print(f"\nNuevo cliente añadido: {cliente_id}. Destino: {destino}. Estado: EN ESPERA.")
+            #print(f"\nNuevo cliente añadido: {cliente_id}. Destino: {destino}. Estado: EN ESPERA.")
 
         # Imprimir la tabla actualizada
         imprimir_tabla_clientes()
@@ -274,7 +274,7 @@ def hilo_lector_cliente(broker, cola_mensajes):
 
                 if coordX_cliente is not None and coordY_cliente is not None:
                     mensaje_asignacion = f"ID:{cliente_id} ASIGNADO TAXI:{taxi_asignado} COORDENADAS:{coordX_cliente},{coordY_cliente} DESTINO:{destino}"
-                    print(f"Taxi asignado: {taxi_asignado} al cliente {cliente_id} en coordenadas {coordX_cliente}, {coordY_cliente}")
+                    #print(f"Taxi asignado: {taxi_asignado} al cliente {cliente_id} en coordenadas {coordX_cliente}, {coordY_cliente}")
                     pasajero_dentro(taxi_asignado,cliente_id,destino)
                     agregarCoordCliente(conexion, cliente_id, coordX_cliente, coordY_cliente)
                     actualizar_tabla_taxis(taxi_asignado)
@@ -308,7 +308,7 @@ def hilo_enviar_coordenadas_taxi(cliente_id, taxi_id, coordX_cliente, coordY_cli
     producer.send('CENTRAL-TAXI', key=str(taxi_id).encode('utf-8'), value=mensaje_coordenadas.encode('utf-8'))
     producer.flush()
     
-    print(f"Enviadas al taxi {taxi_id} las coordenadas de recogida del cliente {cliente_id}: ({coordX_cliente}, {coordY_cliente})")
+    #print(f"Enviadas al taxi {taxi_id} las coordenadas de recogida del cliente {cliente_id}: ({coordX_cliente}, {coordY_cliente})")
 
 
 
@@ -321,7 +321,7 @@ def hilo_lector_taxis(broker):
     while central_activa:
         for message in consumer:
             mensaje = message.value.decode('utf-8')
-            print(f"Mensaje recibido del taxi: {mensaje}")
+            #print(f"Mensaje recibido del taxi: {mensaje}")
             try:
                 partes = mensaje.split(",")
                 taxi_id = int(partes[0])
@@ -340,7 +340,7 @@ def hilo_lector_taxis(broker):
                 nueva_pos_taxi(taxi_id,coordX_taxi,coordY_taxi)
                 actualizar_tabla_taxis(taxi_id)
                 
-                print(f"Taxi ID: {taxi_id}, Coordenadas: ({coordX_taxi}, {coordY_taxi})")
+                #print(f"Taxi ID: {taxi_id}, Coordenadas: ({coordX_taxi}, {coordY_taxi})")
 
                 # Pasar las coordenadas procesadas al hilo principal mediante la cola
                 cola_taxis.put((taxi_id, coordX_taxi, coordY_taxi))
@@ -369,7 +369,7 @@ def procesar_coordenadas_taxi(taxi_id, coordX_taxi_, coordY_taxi_, broker):
 
             # Verificar si el taxi ha llegado a la posición del cliente
             if abs(coordX_taxi_ - coordX_cliente) < 0.1 and abs(coordY_taxi_ - coordY_cliente) < 0.1:
-                print(f"Taxi {taxi_id} ha recogido al cliente {cliente_id}.")
+                #print(f"Taxi {taxi_id} ha recogido al cliente {cliente_id}.")
 
                 cambiarEstadoCliente(conexion, cliente_id, f"EN TAXI {taxi_id}")
                 subir_pasajero(conexion, taxi_id)
@@ -388,7 +388,7 @@ def procesar_coordenadas_taxi(taxi_id, coordX_taxi_, coordY_taxi_, broker):
                 mensaje_confirmacion = f"ID:{cliente_id} IN"
                 producer.send('CENTRAL-CLIENTE', key=cliente_id.encode('utf-8'), value=mensaje_confirmacion.encode('utf-8'))
                 producer.flush()
-                print(f"Confirmación enviada al cliente {cliente_id}: {mensaje_confirmacion}")
+                #print(f"Confirmación enviada al cliente {cliente_id}: {mensaje_confirmacion}")
 
                 # Obtener coordenadas del destino y enviarlas al taxi
                 destino_coords = obtener_destino_coords(conexion, destino)
@@ -397,7 +397,7 @@ def procesar_coordenadas_taxi(taxi_id, coordX_taxi_, coordY_taxi_, broker):
                     mensaje_destino = f"{taxi_id},{coordX_destino},{coordY_destino},{cliente_id}, {coordX_taxi_},{coordY_taxi_},nada"
                     producer.send('CENTRAL-TAXI', key=cliente_id.encode('utf-8'), value=mensaje_destino.encode('utf-8'))
                     producer.flush()
-                    print(f"Enviado al taxi {taxi_id} las coordenadas del destino {destino}: {coordX_destino}, {coordY_destino},{coordX_taxi(taxi_id)},{coordY_taxi(taxi_id)}")
+                    #print(f"Enviado al taxi {taxi_id} las coordenadas del destino {destino}: {coordX_destino}, {coordY_destino},{coordX_taxi(taxi_id)},{coordY_taxi(taxi_id)}")
                 
                 continue  # Continuar al siguiente cliente
 
@@ -411,7 +411,7 @@ def procesar_coordenadas_taxi(taxi_id, coordX_taxi_, coordY_taxi_, broker):
                 coordX_destino, coordY_destino = destino_coords
                 # Verificar si el taxi ha llegado al destino del cliente
                 if abs(coordX_taxi_ - coordX_destino) < 0.1 and abs(coordY_taxi_ - coordY_destino) < 0.1 and taxi_asignado == taxi_id:
-                    print(f"Taxi {taxi_id} ha llegado al destino del cliente {cliente_id}.")
+                    #print(f"Taxi {taxi_id} ha llegado al destino del cliente {cliente_id}.")
                     cambiarEstadoCliente(conexion, cliente_id, "HA LLEGADO")
                     cambiarPosInicialCliente(conexion, cliente_id, coordX_destino, coordY_destino)
 
@@ -423,7 +423,7 @@ def procesar_coordenadas_taxi(taxi_id, coordX_taxi_, coordY_taxi_, broker):
                     mensaje_confirmacion = f"ID:{cliente_id} OK"
                     producer.send('CENTRAL-CLIENTE', key=cliente_id.encode('utf-8'), value=mensaje_confirmacion.encode('utf-8'))
                     producer.flush()
-                    print(f"Confirmación enviada al cliente {cliente_id}: {mensaje_confirmacion}")
+                    #print(f"Confirmación enviada al cliente {cliente_id}: {mensaje_confirmacion}")
 
                     # Liberar el taxi
                     bajar_pasajero(conexion, taxi_id)
