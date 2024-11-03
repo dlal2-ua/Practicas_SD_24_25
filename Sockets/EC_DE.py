@@ -46,7 +46,7 @@ def enviar_central(id_taxi,broker,pasajero):
             dibujar_mapa()
         else:
             while (X_taxi != destinoX or Y_taxi != destinoY) and parar_hilo_enviar_coord==False and Central_para ==False:
-                print(f"En el bucle: {X_taxi} , {Y_taxi}")
+                #print(f"En el bucle: {X_taxi} , {Y_taxi}")
                 if msg_sensor == "OK":
                     if destinoX > X_taxi:
                         X_taxi += 1
