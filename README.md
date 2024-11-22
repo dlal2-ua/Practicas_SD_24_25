@@ -3,15 +3,21 @@
 ```
 %KAFKA_HOME%\bin\windows\zookeeper-server-start.bat .\config\zookeeper.properties
 ```
+```
 %KAFKA_HOME%\bin\windows\kafka-server-start.bat .\config\server.properties
+```
 ```
 pip install git+https://github.com/dpkp/kafka-python.git
 ```
 
-
+## Crear un topico en kafka
+```
 bin\windows\kafka-topics.bat --create --topic SD --bootstrap-server localhost:9092
+```
+## Ver los topicos de kafka
+```
 bin\windows\kafka-topics.bat --list --bootstrap-server localhost:9092
-
+```
 
 winget install --id Git.Git -e --source winget
 
