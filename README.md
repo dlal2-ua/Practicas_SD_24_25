@@ -148,9 +148,6 @@ winget install --id Git.Git -e --source winget
     - Si la temperatura > 0°C: **`KO`**.
     - Si la temperatura ≤ 0°C: **`OK`**.
   
-  ```markdown
-  <span style="color:red">IMPORTANTE</span>
-  <span style="color:yellow">La ciudad podrá ser cambiada en cualquier momento con el menú, sin necesidad de reiniciar ninguna parte del sistema.</span>
 
 
 
