@@ -103,7 +103,7 @@ winget install --id Git.Git -e --source winget
       · Hay que implementar un MENÚ para introducir la ciudad donde se presta el servicio
          · Se conectará al servidor del clima y se le solicitará esta ciudad
          · Si la temperatura > 0 grados, EC_CTC devolverá KO a la central, sino OK
-     
+         ```markdown
            <span style="color:red">IMPORTANTE</span>
            <span style="color:yellow"> La ciudad podrá ser cambiada en cualquier momento con el menú, sin necesidad de reiniciar ninguna parte del sistema. </span>
 
