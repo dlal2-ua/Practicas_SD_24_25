@@ -60,7 +60,6 @@ winget install --id Git.Git -e --source winget
    - Añadir modulo EC_CTC (se comunica via API)
    - Añadir EC_Registry (registrar nuevo taxi y dar de baja) (Comunica con los taxis via API REST)
    - Crear front
-   - 
 
    - Seguridad
            - Autentificar entre taxi y registry
@@ -98,14 +97,15 @@ winget install --id Git.Git -e --source winget
            · Conexion y autentificación de manera segura
 
    - City Traffic Control (EC_CTC)
-      · Devuelve OK en caso de que se pueda circular
-      · Devuelve KO en caso de que NO se pueda circular y los Taxis deban volver a base
-      · Hay que implementar un MENÚ para introducir la ciudad donde se presta el servicio
+      - Devuelve OK en caso de que se pueda circular
+      - Devuelve KO en caso de que NO se pueda circular y los Taxis deban volver a base
+      - Hay que implementar un MENÚ para introducir la ciudad donde se presta el servicio
          · Se conectará al servidor del clima y se le solicitará esta ciudad
          · Si la temperatura > 0 grados, EC_CTC devolverá KO a la central, sino OK
          ```markdown
            <span style="color:red">IMPORTANTE</span>
            <span style="color:yellow"> La ciudad podrá ser cambiada en cualquier momento con el menú, sin necesidad de reiniciar ninguna parte del sistema. </span>
+         ```
 
 ## Instalar Flask
 ```
