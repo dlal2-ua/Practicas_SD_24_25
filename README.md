@@ -93,16 +93,17 @@ winget install --id Git.Git -e --source winget
 
    - Digital Engine (EC_DE)
       · En un menú
-           ~ Para poder conectarse y registrarse a EC_Registry
-           ~ Proceso implementado en una API
-           ~ Conexion y autentificación de manera segura
+           · Para poder conectarse y registrarse a EC_Registry
+           · Proceso implementado en una API
+           · Conexion y autentificación de manera segura
 
    - City Traffic Control (EC_CTC)
       · Devuelve OK en caso de que se pueda circular
       · Devuelve KO en caso de que NO se pueda circular y los Taxis deban volver a base
       · Hay que implementar un MENÚ para introducir la ciudad donde se presta el servicio
-         ~ Se conectará al servidor del clima y se le solicitará esta ciudad
-         ~ Si la temperatura > 0 grados, EC_CTC devolverá KO a la central, sino OK
+         · Se conectará al servidor del clima y se le solicitará esta ciudad
+         · Si la temperatura > 0 grados, EC_CTC devolverá KO a la central, sino OK
+     
            <span style="color:red">IMPORTANTE</span>
            <span style="color:yellow"> La ciudad podrá ser cambiada en cualquier momento con el menú, sin necesidad de reiniciar ninguna parte del sistema. </span>
 
