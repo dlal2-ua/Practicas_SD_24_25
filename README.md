@@ -68,7 +68,43 @@ winget install --id Git.Git -e --source winget
            - Cifrado de datos entre central y taxis
    - Central
       - Consumo de API_rest de un gestor de tráfico de la ciudad
-      - 
+      - Implementación de la autenticación entre EC_Central y los Taxis  (se puede implementar una API rest entre Taxi y Central si queremos (Opcional))
+      - Implementación de cifrado en el canal entre EC_Central y los Taxis (Hacerlo asimetrico) (Kafka tiene 3 cifrados [Cifrado SSL/TLS, Autentificacion SSL o SASL, Autentifiacion ACL] SE VALORA POSITIVAMENTE)
+      - Registro de auditoria (Hacer unos logs) (SIEM (Security Information and Event Management))
+         · Fecha y hora
+         · Quién y desde dónde se produce el evento: IP de la máquina que genera el evento (ej. IP del taxi, IP del Usuario)
+         · Qué acción se realiza: Autenticación o intentos de autenticación fallidos o no, Incidencias durante el servicio, cambio de la situación del tráfico, usuarios o taxis bloqueados, errores, etc.
+         · Parámetros o descripción del evento
+      
+   - API_Central
+      - Crear un API_Rest con los metodos (GET, PUT, DELETE, ....) (Permitirá desde cualquier componente externo consultar el estado de los Taxis, Usuarios y el mapa en curso)
+      - Debe pasar al front toda la información de lo que pasa en la práctica (taxis, usuarios, mensajes de error, estado del CTC, etc).
+        
+   - EC_Registry
+      - Solo dispondrá de las opciones de alta y baja de un taxi
+      - Antes de autenticación y antes de prestar un servicio, tienen que hacer una petición para darse de alta/baja según su ID
+      - Si hace cualquier cosas sin previo registro, mostrar mensaje de error
+
+   - Comuniación entre taxis y su registro se hará por API_Rest
+   - Esta comunicación se hará en un canal seguro (HTTPS, SSL, RSA,...)
+
+   - Base de Datos:
+      · Pueden acceder tanto Central como Registry
+
+   - Digital Engine (EC_DE)
+      · En un menú
+           ~ Para poder conectarse y registrarse a EC_Registry
+           ~ Proceso implementado en una API
+           ~ Conexion y autentificación de manera segura
+
+   - City Traffic Control (EC_CTC)
+      · Devuelve OK en caso de que se pueda circular
+      · Devuelve KO en caso de que NO se pueda circular y los Taxis deban volver a base
+      · Hay que implementar un MENÚ para introducir la ciudad donde se presta el servicio
+         ~ Se conectará al servidor del clima y se le solicitará esta ciudad
+         ~ Si la temperatura > 0 grados, EC_CTC devolverá KO a la central, sino OK
+           <span style="color:red">IMPORTANTE</span>
+           <span style="color:yellow"> La ciudad podrá ser cambiada en cualquier momento con el menú, sin necesidad de reiniciar ninguna parte del sistema. </span>
 
 ## Instalar Flask
 ```
