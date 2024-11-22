@@ -106,7 +106,6 @@ winget install --id Git.Git -e --source winget
            <span style="color:red">IMPORTANTE</span>
            <span style="color:yellow"> La ciudad podrá ser cambiada en cualquier momento con el menú, sin necesidad de reiniciar ninguna parte del sistema. </span>
             ```
-        <span style="color:red">Este texto es rojo.</span>
 
 
 ## Instalar Flask
