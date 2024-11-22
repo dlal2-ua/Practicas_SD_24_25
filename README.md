@@ -53,3 +53,55 @@ winget install --id Git.Git -e --source winget
 3. Abrir dos terminales (cmd) y hacer `cd ..` hasta llegar a `C:\`, luego entrar en la carpeta de Kafka:
    ```bash
    cd <nombre_carpeta_kafka>
+
+
+# Cosas que implementar (PRACTICA 2)
+   - Comunicar EC_CTC con la central
+   - Añadir modulo EC_CTC (se comunica via API)
+   - Añadir EC_Registry (registrar nuevo taxi y dar de baja) (Comunica con los taxis via API REST)
+   - Crear front
+   - 
+
+   - Seguridad
+           - Autentificar entre taxi y registry
+           - Auditoria de eventos de central
+           - Cifrado de datos entre central y taxis
+   - Central
+      - Consumo de API_rest de un gestor de tráfico de la ciudad
+      - 
+
+## Instalar Flask
+```
+pip install flask
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
