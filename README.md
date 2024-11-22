@@ -70,7 +70,7 @@ winget install --id Git.Git -e --source winget
       - Implementación de la autenticación entre EC_Central y los Taxis  (se puede implementar una API rest entre Taxi y Central si queremos (Opcional))
       - Implementación de cifrado en el canal entre EC_Central y los Taxis (Hacerlo asimetrico) (Kafka tiene 3 cifrados [Cifrado SSL/TLS, Autentificacion SSL o SASL, Autentifiacion ACL] SE VALORA POSITIVAMENTE)
       - Registro de auditoria (Hacer unos logs) (SIEM (Security Information and Event Management))
-         · Fecha y hora
+        · Fecha y hora
          · Quién y desde dónde se produce el evento: IP de la máquina que genera el evento (ej. IP del taxi, IP del Usuario)
          · Qué acción se realiza: Autenticación o intentos de autenticación fallidos o no, Incidencias durante el servicio, cambio de la situación del tráfico, usuarios o taxis bloqueados, errores, etc.
          · Parámetros o descripción del evento
