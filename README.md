@@ -1,10 +1,10 @@
 
 ## KAFKA
 ```
-%KAFKA_HOME%\bin\windows\zookeeper-server-start.bat .\config\zookeeper.properties
+bin\windows\zookeeper-server-start.bat .\config\zookeeper.properties
 ```
 ```
-%KAFKA_HOME%\bin\windows\kafka-server-start.bat .\config\server.properties
+bin\windows\kafka-server-start.bat .\config\server.properties
 ```
 ```
 pip install git+https://github.com/dpkp/kafka-python.git
