@@ -162,34 +162,34 @@ pip install mysql-connector-python
 ```
 
 ## **Instalar MySQL Server en Windows**
-	- Descargar MySQL Installer:
-	- Descarga el instalador de MySQL desde la página oficial: MySQL Installer.
+- Descargar MySQL Installer:
+- Descarga el instalador de MySQL desde la página oficial: MySQL Installer.
 
 ## **Instalar MySQL Server:**
-	- Ejecuta el instalador.
-	- Selecciona Server Only según lo que necesites.
-	- Durante la configuración, establece el usuario root y su contraseña.
+- Ejecuta el instalador.
+- Selecciona Server Only según lo que necesites.
+- Durante la configuración, establece el usuario root y su contraseña.
 ## **Configurar el Servicio MySQL:**
-	- El instalador configurará el servicio de MySQL para que se inicie automáticamente.
-	- Puedes verificarlo en services.msc.
+- El instalador configurará el servicio de MySQL para que se inicie automáticamente.
+- Puedes verificarlo en services.msc.
 
 ## **Opcional: Permitir Acceso Remoto:  (YO DE ESTO NO HE TOCADO NADA)**
 
-	- Durante la configuración, permite conexiones remotas al configurar el servidor.
-	- Asegúrate de abrir el puerto 3306 en el firewall de Windows:
-	- Abre "Firewall de Windows".
-	- Agrega una regla de entrada para el puerto TCP 3306.
+- Durante la configuración, permite conexiones remotas al configurar el servidor.
+- Asegúrate de abrir el puerto 3306 en el firewall de Windows:
+- Abre "Firewall de Windows".
+- Agrega una regla de entrada para el puerto TCP 3306.
 
 ## **En la instalación crear dos usuarios:**
-	- Usuario root: mysqlSD:1234
-	- Usuario remoto: mysqlRemotoSD:1234
+- Usuario root: mysqlSD:1234
+- Usuario remoto: mysqlRemotoSD:1234
 
 ## **Una vez instalado:**
-	- Esto también se puede hacer desde código en python
-	- Abrir en el buscador de windows: MySQL command client line
-	- CREATE DATABASE bbdd;
+- Esto también se puede hacer desde código en python
+- Abrir en el buscador de windows: MySQL command client line
+- CREATE DATABASE bbdd;
 
-##Hemos usado DBEAVER para ver las tablas y su información
+## Hemos usado DBEAVER para ver las tablas y su información
 
 
 
