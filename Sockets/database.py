@@ -1,51 +1,55 @@
-import sqlite3
-
-# Conectar (o crear) una base de datos llamada 'database.db'
-conexion = sqlite3.connect('database.db')
-
-# Crear un cursor para ejecutar comandos SQL
-cursor = conexion.cursor()
-
 # Crear una tabla llamada 'taxis' con las columnas 'id', 'destino_a_cliente', 'destino_a_final', 'estado', 'coordX' y 'coordY'
 #He añadido destino a cliente (para que salga en pantalla que va en direccion cliente) y destino a final (cuando haya recogido al cliente, en la tabla aparecerá el destino final)
 #La central pasará toda la información a los taxis sobre el cliente, y el taxi ya tendra tanto la informacion para recoger como para dejar al cliente
 
+import mysql.connector
+
+# Conectar a la base de datos MySQL
+conexion = mysql.connector.connect(
+    host="localhost",  # Cambia por la IP del servidor si es remoto
+    user="mysqlSD",       # Usuario de MySQL
+    password="1234",  # Contraseña configurada
+    database="bbdd"  # Nombre de la base de datos
+)
+
+cursor = conexion.cursor()
+
+# Crear las tablas
 cursor.execute('''
 CREATE TABLE IF NOT EXISTS taxis (
-    id INTEGER PRIMARY KEY,
-    destino_a_cliente CHAR,
-    destino_a_final CHAR,
-    estado INTEGER ,
-    coordX INTEGER NOT NULL,
-    coordY INTEGER NOT NULL,
-    pasajero INTEGER NOT NULL
-
+    id INT PRIMARY KEY,
+    destino_a_cliente VARCHAR(255),
+    destino_a_final VARCHAR(255),
+    estado INT,
+    coordX FLOAT NOT NULL,
+    coordY FLOAT NOT NULL,
+    pasajero INT NOT NULL
 )
 ''')
 
 cursor.execute('''
 CREATE TABLE IF NOT EXISTS clientes (
-    id CHAR PRIMARY KEY,
-    destino CHAR NOT NULL,
-    estado STRING NOT NULL,
-    coordX INTEGER NOT NULL,
-    coordY INTEGER NOT NULL
+    id VARCHAR(255) PRIMARY KEY,
+    destino VARCHAR(255) NOT NULL,
+    estado VARCHAR(255) NOT NULL,
+    coordX FLOAT NOT NULL,
+    coordY FLOAT NOT NULL
 )
 ''')
 
 cursor.execute('''
-CREATE TABLE IF NOT EXISTS pos_inicial_cliente(
-    id CHAR PRIMARY KEY,
-    coordX INTEGER NOT NULL,
-    coordY INTEGER NOT NULL
+CREATE TABLE IF NOT EXISTS pos_inicial_cliente (
+    id VARCHAR(255) PRIMARY KEY,
+    coordX FLOAT NOT NULL,
+    coordY FLOAT NOT NULL
 )
 ''')
-        
+
 cursor.execute('''
-CREATE TABLE IF NOT EXISTS destinos(
-    destino CHAR PRIMARY KEY,
-    coordX INTEGER NOT NULL,
-    coordY INTEGER NOT NULL
+CREATE TABLE IF NOT EXISTS destinos (
+    destino VARCHAR(255) PRIMARY KEY,
+    coordX FLOAT NOT NULL,
+    coordY FLOAT NOT NULL
 )
 ''')
        
@@ -97,9 +101,10 @@ cursor.execute('''
 # Confirmar la creación de la tabla
 conexion.commit()
 
+cursor.close()
+
 # Cerrar la conexión
 conexion.close()
-
 
 
 
