@@ -7,7 +7,7 @@ from funciones_generales import *
 import os
 
 HEADER = 64
-SERVER = "127.0.0.1" #socket.gethostbyname(socket.gethostname())
+SERVER = socket.gethostbyname(socket.gethostname())
 PORT = 5050
 FORMAT = 'utf-8'
 parar_hilo_enviar_coord = False
