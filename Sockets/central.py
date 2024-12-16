@@ -16,6 +16,7 @@ import os
 from colorama import Fore, init
 ##======
 import CENTRA_prueba_dani
+import secrets
 
 """
 En Python, no se puede manejr señales (como SIGINT o SIGTERM) en hilos secundarios.
