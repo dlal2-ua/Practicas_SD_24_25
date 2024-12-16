@@ -1,8 +1,6 @@
 import mysql.connector
 import pandas as pd
 from sqlalchemy import create_engine
-import pymysql
-import secrets
 
 
 #================================================
@@ -13,19 +11,12 @@ import secrets
 def conectar_bd():
     conexion = mysql.connector.connect(
         host="localhost",  # Cambia por la IP del servidor MySQL si es remoto
-        user="root",  # Usuario de MySQL
+        user="mysqlSD",  # Usuario de MySQL
         password="1234",  # Contraseña configurada
         database="bbdd"  # Nombre de la base de datos
     )
     
     return conexion
-def conectar_bd2():
-    host="localhost"  # Cambia por la IP del servidor MySQL si es remoto
-    user="root"  # Usuario de MySQL
-    password="1234"  # Contraseña configurada
-    database="bbdd"  # Nombre de la base de datos
-    engine = create_engine(f"mysql+pymysql://{user}:{password}@{host}/{database}")
-    return engine
 
 
 # Configuración global para SQLAlchemy
@@ -38,16 +29,7 @@ def obtener_engine():
     return create_engine(f"mysql+pymysql://{usuario}:{contraseña}@{servidor}:{puerto}/{base_datos}")
 
 #================================================
-def generarToken(id):
-    conexion = conectar_bd()
-    cursor = conexion.cursor()
-    token = secrets.token_hex(16)
-    cursor.execute(f"UPDATE encriptado SET taxis = (?) WHERE id = (?)",(id,token,))
-    conexion.commit()
-    conexion.close()
 
-
-#================================================================================================
 def coordX_taxi(id_taxi):
     conexion = conectar_bd()
     cursor = conexion.cursor()
@@ -107,14 +89,8 @@ def autentificar_taxi(id_taxi):
     conexion.commit()
     cursor.close()
     conexion.close()
-    conexion = conectar_bd()
-    cursor = conexion.cursor()
-    cursor.execute("INSERT INTO encriptado (taxi) VALUES (?)", (id_taxi,))
-    conexion.commit()
-    cursor.close()
-    conexion.close()
 
-"""
+
 def buscar_taxi_arg(msg):
     engine = obtener_engine()
     query = f"SELECT id FROM taxis WHERE id = {msg} AND estado IS NULL"
@@ -252,13 +228,7 @@ def agregarCoordCliente(conexion, id, coordX, coordY):
 
 
 def obtener_destinos(conexion):
-    # Configuración del motor SQLAlchemy para MySQL
-    usuario = "root"
-    contraseña = "1234"
-    servidor = "localhost"  # Cambia esto si tu servidor es remoto
-    puerto = "3306"         # Puerto por defecto de MySQL
-    base_datos = "bbdd"
-
+    
     # Crear el motor SQLAlchemy
     engine = obtener_engine()
 
@@ -396,15 +366,26 @@ def taxi_siguiente_servicio_tabla(conexion, taxi_id):
 
 #     FUNCION PRACTICA 2
 
-def cambiar_estado_TAXI_ciudad_ko(conexion):
+def cambiar_estado_TAXI_ciudad_ko(taxi_id):
+    conexion = conectar_bd()
     cursor = conexion.cursor()
-    cursor.execute("UPDATE taxis SET estado = 4")
+    cursor.execute("UPDATE taxis SET estado = 4 where id = %s", (taxi_id,))
     conexion.commit()  # Asegurar que los cambios se guarden en la base de datos
     cursor.close()  # Cerrar el cursor después de realizar la operación
 
 
-def cambiar_estado_TAXI_ciudad_ok(conexion):
+def cambiar_estado_TAXI_ciudad_ok():
+    conexion = conectar_bd()
     cursor = conexion.cursor()
     cursor.execute("UPDATE taxis SET estado = 0")
     conexion.commit()  # Asegurar que los cambios se guarden en la base de datos
     cursor.close()  # Cerrar el cursor después de realizar la operación
+
+def obtener_datos_TAXI_ciudad():
+    conexion = conectar_bd()
+    cursor = conexion.cursor()
+    cursor.execute("SELECT id, coordX, coordY, destino_a_cliente, estado FROM taxis")
+    taxi = cursor.fetchall()
+    cursor.close()
+    conexion.close()
+    return taxi
