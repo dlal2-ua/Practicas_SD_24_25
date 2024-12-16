@@ -1,5 +1,6 @@
 import requests
 import time
+from EC_Central import temperatura
 
 
 ## INSTALAR ->>>>>>>> pip install sqlalchemy pymysql
@@ -43,6 +44,7 @@ def controlador_menu(opcion):
 
     elif opcion == "2":
         cambiar_ciudad()
+        temperatura()
 
     elif opcion == "3":
         print("Saliendo del programa.")
@@ -53,40 +55,15 @@ def controlador_menu(opcion):
 
 
 
-
-
-####================================================================================================
-"""
-while True:
-     try:
-         menu()
-         opcion = input("Elige una opción (1, 2, 3): ")
-
-         if opcion == "1":
-             try:
-                 response = requests.get(EC_CTC_URL)
-                 if response.status_code == 200:
-                     data = response.json()
-                     print("")
-                     print(f"Estado del tráfico en {data['city']}: {data['status']} (Temperatura: {data['temperature']}°C)")
-                 else:
-                     print("Error al consultar EC_CTC:", response.json())
-             except requests.exceptions.RequestException as e:
-                 print("No se ha podido conectar con EC_CTC, reintentando...")
-
-         elif opcion == "2":
-             cambiar_ciudad()
-
-         elif opcion == "3":
-             print("Saliendo del programa.")
-             break
-
-         else:
-             print("Opción no válida. Por favor, elige una opción entre 1 y 3.")
-
-         #time.sleep(10)  # Esperar 10 segundos antes de la siguiente consulta
-
-     except KeyboardInterrupt:
-         #print("\nInterrupción detectada. Saliendo del programa...")
-         break
-"""
+# Función para obtener la temperatura de la ciudad
+def coger_temperatura():
+    try:
+        response = requests.get(EC_CTC_URL)
+        if response.status_code == 200:
+            data = response.json()
+            #print(data['temperature'])
+            return int(data['temperature'])
+        else:
+            print("Error al consultar EC_CTC:", response.json())
+    except requests.exceptions.RequestException as e:
+        print("No se ha podido conectar con EC_CTC, reintentando...")

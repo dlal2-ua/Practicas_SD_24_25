@@ -18,7 +18,6 @@ cursor.execute('''
     DROP TABLE IF EXISTS taxis, clientes, pos_inicial_cliente, destinos,encriptado
     ''')
 
-
 # Crear las tablas
 cursor.execute('''
 CREATE TABLE IF NOT EXISTS taxis (
@@ -26,8 +25,8 @@ CREATE TABLE IF NOT EXISTS taxis (
     destino_a_cliente VARCHAR(255),
     destino_a_final VARCHAR(255),
     estado INT,
-    coordX FLOAT NOT NULL,
-    coordY FLOAT NOT NULL,
+    coordX INT NOT NULL,
+    coordY INT NOT NULL,
     pasajero INT NOT NULL
 )
 ''')
@@ -37,16 +36,16 @@ CREATE TABLE IF NOT EXISTS clientes (
     id VARCHAR(255) PRIMARY KEY,
     destino VARCHAR(255) NOT NULL,
     estado VARCHAR(255) NOT NULL,
-    coordX FLOAT NOT NULL,
-    coordY FLOAT NOT NULL
+    coordX INT NOT NULL,
+    coordY INT NOT NULL
 )
 ''')
 
 cursor.execute('''
 CREATE TABLE IF NOT EXISTS pos_inicial_cliente (
     id VARCHAR(255) PRIMARY KEY,
-    coordX FLOAT NOT NULL,
-    coordY FLOAT NOT NULL
+    coordX INT NOT NULL,
+    coordY INT NOT NULL
 )
 ''')
 cursor.execute('''
@@ -59,8 +58,8 @@ CREATE TABLE IF NOT EXISTS encriptado (
 cursor.execute('''
 CREATE TABLE IF NOT EXISTS destinos (
     destino VARCHAR(255) PRIMARY KEY,
-    coordX FLOAT NOT NULL,
-    coordY FLOAT NOT NULL
+    coordX INT NOT NULL,
+    coordY INT NOT NULL
 )
 ''')
        
@@ -72,7 +71,7 @@ CREATE TABLE IF NOT EXISTS destinos (
 
 cursor.execute('''
     INSERT INTO pos_inicial_cliente (id, coordX, coordY) VALUES 
-    ('a', 2, 6),
+    ('a', 19, 19),
     ('b', 4, 8),
     ('c', 7, 11),
     ('d', 2, 17),

@@ -1,6 +1,6 @@
 import requests
 import time
-from central import temperatura
+from central import temperatura_activa
 
 
 ## INSTALAR ->>>>>>>> pip install sqlalchemy pymysql
@@ -44,7 +44,7 @@ def controlador_menu(opcion):
 
     elif opcion == "2":
         cambiar_ciudad()
-        temperatura()
+        temperatura_activa()
 
     elif opcion == "3":
         print("Saliendo del programa.")
