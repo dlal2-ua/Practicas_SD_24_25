@@ -366,15 +366,26 @@ def taxi_siguiente_servicio_tabla(conexion, taxi_id):
 
 #     FUNCION PRACTICA 2
 
-def cambiar_estado_TAXI_ciudad_ko(conexion):
+def cambiar_estado_TAXI_ciudad_ko(taxi_id):
+    conexion = conectar_bd()
     cursor = conexion.cursor()
-    cursor.execute("UPDATE taxis SET estado = 4")
+    cursor.execute("UPDATE taxis SET estado = 4 where id = %s", (taxi_id,))
     conexion.commit()  # Asegurar que los cambios se guarden en la base de datos
     cursor.close()  # Cerrar el cursor después de realizar la operación
 
 
-def cambiar_estado_TAXI_ciudad_ok(conexion):
+def cambiar_estado_TAXI_ciudad_ok():
+    conexion = conectar_bd()
     cursor = conexion.cursor()
     cursor.execute("UPDATE taxis SET estado = 0")
     conexion.commit()  # Asegurar que los cambios se guarden en la base de datos
     cursor.close()  # Cerrar el cursor después de realizar la operación
+
+def obtener_datos_TAXI_ciudad():
+    conexion = conectar_bd()
+    cursor = conexion.cursor()
+    cursor.execute("SELECT id, coordX, coordY, destino_a_cliente, estado FROM taxis")
+    taxi = cursor.fetchall()
+    cursor.close()
+    conexion.close()
+    return taxi

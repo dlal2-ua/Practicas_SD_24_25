@@ -1,43 +1,23 @@
-import mysql.connector
+import sqlite3
 import pandas as pd
-from sqlalchemy import create_engine
 
+#================================================================================================
 
-#================================================
-
-## INSTALAR ->>>>>>>> pip install sqlalchemy pymysql
-
-# Conectar a la base de datos MySQL
+# Conectar a la base de datos SQLite
 def conectar_bd():
-    conexion = mysql.connector.connect(
-        host="localhost",  # Cambia por la IP del servidor MySQL si es remoto
-        user="mysqlSD",  # Usuario de MySQL
-        password="1234",  # Contraseña configurada
-        database="bbdd"  # Nombre de la base de datos
-    )
-    
+    conexion = sqlite3.connect('database.db')  # Cambia a la ruta de tu base de datos
     return conexion
 
-
-# Configuración global para SQLAlchemy
-def obtener_engine():
-    usuario = "mysqlSD"
-    contraseña = "1234"
-    servidor = "localhost"
-    puerto = "3306"
-    base_datos = "bbdd"
-    return create_engine(f"mysql+pymysql://{usuario}:{contraseña}@{servidor}:{puerto}/{base_datos}")
-
-#================================================
+#================================================================================================
 
 def coordX_taxi(id_taxi):
     conexion = conectar_bd()
     cursor = conexion.cursor()
-    cursor.execute(f"SELECT coordX FROM taxis WHERE id = {id_taxi} ")
+    cursor.execute(f"SELECT coordX FROM taxis WHERE id == {id_taxi} ")
     coordenada = cursor.fetchall()[0][0]
     cursor.close()
     conexion.close()
-    return int(coordenada)
+    return coordenada
 def nueva_pos_taxi (id_taxi,x,y):
     conexion = conectar_bd()
     cursor = conexion.cursor()
@@ -48,11 +28,11 @@ def nueva_pos_taxi (id_taxi,x,y):
 def coordY_taxi(id_taxi):
     conexion = conectar_bd()
     cursor = conexion.cursor()
-    cursor.execute(f"SELECT coordY FROM taxis WHERE id = {id_taxi} ")
+    cursor.execute(f"SELECT coordY FROM taxis WHERE id == {id_taxi} ")
     coordenada = cursor.fetchall()[0][0]
     cursor.close()
     conexion.close()
-    return int(coordenada)
+    return coordenada
 def sacar_taxi(id_taxi):
     conexion = conectar_bd()
     cursor = conexion.cursor()
@@ -65,22 +45,27 @@ def pasajero_dentro(id_taxi,cliente,Destino):
     d = Destino[0]
     conexion = conectar_bd()
     cursor = conexion.cursor()
-    cursor.execute("UPDATE taxis SET destino_a_cliente = %s, destino_a_final = %s  WHERE id = %s",(c,d,id_taxi))
+    cursor.execute("UPDATE taxis SET destino_a_cliente = ?, destino_a_final = ?  WHERE id == ?",(c,d,id_taxi))
     conexion.commit()
     cursor.close()
     conexion.close()
 def pasajero_fuera(id_taxi):
     conexion = conectar_bd()
     cursor = conexion.cursor()
-    cursor.execute(f"UPDATE taxis SET destino_a_cliente = NULL, destino_a_final = NULL  WHERE id = {id_taxi}")
+    cursor.execute(f"UPDATE taxis SET destino_a_cliente = NULL, destino_a_final = NULL  WHERE id == {id_taxi}")
     conexion.commit()
     cursor.close()
     conexion.close()
 def buscar_taxi_activo(msg):
-    engine = obtener_engine()
-    query = f"SELECT id FROM taxis WHERE id = {msg} AND (estado = 0 OR estado = 1 OR estado = 2 OR estado = 3)"
-    df_busqueda = pd.read_sql_query(query, engine)
-    return not df_busqueda.empty  # Retorna True si encuentra el taxi, False si no
+    conexion = conectar_bd()
+    query = f"SELECT id FROM taxis WHERE id == {msg} AND (estado = 0 or estado = 1 or estado = 2 or estado = 3)"
+    df_busqueda = pd.read_sql_query(query,conexion)
+    if df_busqueda.empty:
+        conexion.close()
+        return False
+    else:
+        conexion.close()
+        return True
     
 def autentificar_taxi(id_taxi):
     conexion = conectar_bd()
@@ -92,10 +77,15 @@ def autentificar_taxi(id_taxi):
 
 
 def buscar_taxi_arg(msg):
-    engine = obtener_engine()
-    query = f"SELECT id FROM taxis WHERE id = {msg} AND estado IS NULL"
-    df_busqueda = pd.read_sql_query(query, engine)
-    return not df_busqueda.empty  # Retorna True si encuentra el taxi, False si no
+    conexion = conectar_bd()
+    query = f"SELECT id FROM taxis WHERE id == {msg} AND estado IS NULL"
+    df_busqueda = pd.read_sql_query(query,conexion)
+    if df_busqueda.empty:
+        conexion.close()
+        return False
+    else:
+        conexion.close()
+        return True
 def obtener_cliente(id):
     conexion = conectar_bd()
     cursor = conexion.cursor()
@@ -107,12 +97,11 @@ def obtener_cliente(id):
 def existe_pasajero(id):
     conexion = conectar_bd()
     cursor = conexion.cursor()
-    cursor.execute("SELECT pasajero FROM taxis WHERE id = %s", (id,))
+    cursor.execute("SELECT pasajero FROM taxis WHERE id = ?", (id,))
     resultado = cursor.fetchone()
     if resultado is not None:
         return resultado[0] == 1
     return False
-
 
 def obtener_destino_final_de_taxi(taxi_id):
     conexion = conectar_bd()
@@ -152,7 +141,7 @@ def hay_pasajero(taxi_id):
 def cambiar_destino(taxi_id,destino):
     conexion = conectar_bd()
     cursor = conexion.cursor()
-    cursor.execute(f"UPDATE taxis SET destino_a_final = %s WHERE id = %s",(destino,taxi_id))
+    cursor.execute(f"UPDATE taxis SET destino_a_final = ? WHERE id = ?",(destino,taxi_id))
     conexion.commit()
     cursor.close()
     conexion.close()
@@ -177,32 +166,33 @@ def parado_sensor(taxi):
     conexion.commit()
     cursor.close()
     conexion.close()
-###========= FUNCIONES DE BASE DE DATOS =========###
+
+###================== FUNCIONES DE BASE DE DATOS ==================###
 
 # Función para obtener destinos desde la base de datos
 
 def cambiarPosInicialCliente(conexion, id, coordX, coordY):
     try:
         cursor = conexion.cursor()
-        cursor.execute("UPDATE pos_inicial_cliente SET coordX = %s, coordY = %s WHERE id = %s", (coordX, coordY, id))
+        cursor.execute("UPDATE pos_inicial_cliente SET coordX = ?, coordY = ? WHERE id = ?", (coordX, coordY, id))
         conexion.commit()
-    except mysql.connector.Error as e:
+    except sqlite3.Error as e:
         print(f"Error al actualizar coordenadas iniciales del cliente en la base de datos: {e}")
 
 def agregarCliente(conexion, id, destino, estado, coordX, coordY):
     try:
         cursor = conexion.cursor()
-        cursor.execute("INSERT INTO clientes (id, destino, estado, coordX, coordY) VALUES (%s, %s, %s, %s, %s)", (id, destino, estado, coordX, coordY))
+        cursor.execute("INSERT INTO clientes (id, destino, estado, coordX, coordY) VALUES (?, ?, ?, ?, ?)", (id, destino, estado, coordX, coordY))
         conexion.commit()
-    except mysql.connector.Error as e:
+    except sqlite3.Error as e:
         print(f"Error al insertar cliente en la base de datos: {e}")
 
 def buscarCliente(conexion, id):
     try:
         cursor = conexion.cursor()
-        cursor.execute("SELECT * FROM clientes WHERE id = %s", (id,))
+        cursor.execute("SELECT * FROM clientes WHERE id = ?", (id,))
         return cursor.fetchone() is not None
-    except mysql.connector.Error as e:
+    except sqlite3.Error as e:
         print(f"Error al buscar cliente en la base de datos: {e}")
         return False
 
@@ -211,29 +201,25 @@ def buscarCliente(conexion, id):
 def cambiarEstadoCliente(conexion, id, estado):
     try:
         cursor = conexion.cursor()
-        cursor.execute("UPDATE clientes SET estado = %s WHERE id = %s", (estado, id))
+        cursor.execute("UPDATE clientes SET estado = ? WHERE id = ?", (estado, id))
         conexion.commit()
-    except mysql.connector.Error as e:
+    except sqlite3.Error as e:
         print(f"Error al actualizar estado del cliente en la base de datos: {e}")
 
 
 def agregarCoordCliente(conexion, id, coordX, coordY):
     try:
         cursor = conexion.cursor()
-        cursor.execute("UPDATE clientes SET coordX = %s, coordY = %s WHERE id = %s", (coordX, coordY, id))
+        cursor.execute("UPDATE clientes SET coordX = ?, coordY = ? WHERE id = ?", (coordX, coordY, id))
         conexion.commit()
-    except mysql.connector.Error as e:
+    except sqlite3.Error as e:
         print(f"Error al actualizar coordenadas del cliente en la base de datos: {e}")
 
 
 
 def obtener_destinos(conexion):
-    
-    # Crear el motor SQLAlchemy
-    engine = obtener_engine()
-
     query = "SELECT destino, coordX, coordY FROM destinos"
-    df_destinos = pd.read_sql_query(query, engine)
+    df_destinos = pd.read_sql_query(query, conexion)
     destinos_dict = {row['destino']: (row['coordX'], row['coordY']) for _, row in df_destinos.iterrows()}
     return destinos_dict
 
@@ -241,7 +227,7 @@ def obtener_destinos(conexion):
 # Función para liberar un taxi después de completar el viaje
 def liberar_taxi(conexion, taxi_id):
     cursor = conexion.cursor()
-    cursor.execute("UPDATE taxis SET estado = 1 WHERE id = %s", (taxi_id,))
+    cursor.execute("UPDATE taxis SET estado = 1 WHERE id = ?", (taxi_id,))
     conexion.commit()  # Asegurar que los cambios se guarden en la base de datos
 
 
@@ -257,46 +243,46 @@ def obtener_taxi_disponible(conexion):
     # Si se encuentra un taxi disponible, cambiar su estado a ocupado (0)
     if taxi:
         taxi_id = taxi[0]
-        cursor.execute("UPDATE taxis SET estado = 0 WHERE id = %s", (taxi_id,))
+        cursor.execute("UPDATE taxis SET estado = 0 WHERE id = ?", (taxi_id,))
         conexion.commit()  # Asegurar que los cambios se guarden en la base de datos
         return taxi_id
     else:
         return None  # No hay taxis disponibles
 
 
+# Función para obtener las coordenadas iniciales del cliente
 def obtener_pos_inicial_cliente(cliente_id):
     # Establecer una nueva conexión a la base de datos para cada hilo
-    engine = obtener_engine()
-   
-    # Usar parámetros en la consulta para evitar inyección SQL
-    query = "SELECT coordX, coordY FROM pos_inicial_cliente WHERE id = %s"
-    df_pos_inicial = pd.read_sql_query(query, engine, params=(cliente_id,))
-    
-    if not df_pos_inicial.empty:
-        # Convertir coordX y coordY a enteros
-        coordX = int(df_pos_inicial['coordX'][0])
-        coordY = int(df_pos_inicial['coordY'][0])
-        return coordX, coordY
-    else:
-        print(f"No se encontraron coordenadas para el cliente {cliente_id}.")
-        return None, None  # Manejo del error
+    conexion = conectar_bd()
+    try:
+        # Usar parámetros en la consulta para evitar inyección SQL
+        query = "SELECT coordX, coordY FROM pos_inicial_cliente WHERE id = ?"
+        df_pos_inicial = pd.read_sql_query(query, conexion, params=(cliente_id,))
+        if not df_pos_inicial.empty:
+            return df_pos_inicial['coordX'][0], df_pos_inicial['coordY'][0]
+        else:
+            print(f"No se encontraron coordenadas para el cliente {cliente_id}.")
+            return None, None  # Manejo del error
+    finally:
+        conexion.close()  # Asegúrate de cerrar la conexión después de usarla
 
 
 
 # Función para obtener las coordenadas del destino desde la base de datos
 def obtener_destino_coords(conexion, destino):
-    query = "SELECT coordX, coordY FROM destinos WHERE destino = %s"
+    query = "SELECT coordX, coordY FROM destinos WHERE destino = ?"
     cursor = conexion.cursor()
     cursor.execute(query, (destino,))
     resultado = cursor.fetchone()
 
     if resultado:
-        return int(resultado[0]), int(resultado[1])  # Retornar coordX y coordY
+        return resultado[0], resultado[1]  # Retornar coordX y coordY
     else:
         print(f"No se encontraron coordenadas para el destino {destino}")
         return None
     
 def obtener_taxis(conexion):
+   
     cursor = conexion.cursor()
     query = """
         SELECT id, coordX, coordY, estado
@@ -304,33 +290,29 @@ def obtener_taxis(conexion):
     """
     cursor.execute(query)
     taxis = cursor.fetchall()
-    
-    # Asegúrate de que esta línea está alineada correctamente
-    taxis_modificados = [(taxi_id, int(coordX), int(coordY), estado) for taxi_id, coordX, coordY, estado in taxis]  # Convertimos a enteros
-    return taxis_modificados
-
+    return taxis  # Retorna una lista de tuplas: (taxi_id, coordX, coordY, estado)
 
 
 # Función para obtener los datos del taxi de la base de datos
 def obtener_datos_taxi(conexion, taxi_id):
     cursor = conexion.cursor()
     # Supongamos que la base de datos tiene los campos necesarios para ambos destinos y el estado del pasajero
-    cursor.execute("SELECT destino_a_cliente, destino_a_final, estado, coordX, coordY, pasajero FROM taxis WHERE id = %s", (taxi_id,))
+    cursor.execute("SELECT destino_a_cliente, destino_a_final, estado, coordX, coordY, pasajero FROM taxis WHERE id = ?", (taxi_id,))
     resultado = cursor.fetchone()
 
     if resultado:
         destino_al_cliente, destino_a_final, estado, coordX, coordY, estado_pasajero = resultado
-        return destino_al_cliente, destino_a_final, estado, int(coordX), int(coordY), estado_pasajero
+        return destino_al_cliente, destino_a_final, estado, coordX, coordY, estado_pasajero
     return None, None, None, None, None, None
 
 def subir_pasajero(conexion, taxi_id):
     cursor = conexion.cursor()
-    cursor.execute("UPDATE taxis SET pasajero = 1 WHERE id = %s", (taxi_id,))
+    cursor.execute("UPDATE taxis SET pasajero = 1 WHERE id = ?", (taxi_id,))
     conexion.commit()  # Asegurar que los cambios se guarden en la base de datos
 
 def bajar_pasajero(conexion, taxi_id):
     cursor = conexion.cursor()
-    cursor.execute("UPDATE taxis SET pasajero = 0 WHERE id = %s", (taxi_id,))
+    cursor.execute("UPDATE taxis SET pasajero = 0 WHERE id = ?", (taxi_id,))
     conexion.commit()  # Asegurar que los cambios se guarden en la base de datos
 
 
@@ -347,7 +329,7 @@ def cliente_en_servicio(conexion, cliente_id):
     cursor.execute("""
         SELECT COUNT(*) 
         FROM taxis 
-        WHERE destino_a_cliente = %s AND estado = 0
+        WHERE destino_a_cliente = ? AND estado = 0
     """, (cliente_id,))
     
     # Si COUNT(*) es mayor que 0, significa que existe al menos un taxi con esas condiciones
@@ -357,24 +339,9 @@ def cliente_en_servicio(conexion, cliente_id):
 
 def taxi_siguiente_servicio_tabla(conexion, taxi_id):
     cursor = conexion.cursor()
-    cursor.execute("UPDATE taxis SET destino_a_cliente = NULL, destino_a_final = NULL WHERE id = %s", (taxi_id,))
+    cursor.execute("UPDATE taxis SET destino_a_cliente = NULL, destino_a_final = NULL WHERE id = ?", (taxi_id,))
     conexion.commit()  # Asegurar que los cambios se guarden en la base de datos
 
 
-###======================================
-###======================================
-
-#     FUNCION PRACTICA 2
-
-def cambiar_estado_TAXI_ciudad_ko(conexion):
-    cursor = conexion.cursor()
-    cursor.execute("UPDATE taxis SET estado = 4")
-    conexion.commit()  # Asegurar que los cambios se guarden en la base de datos
-    cursor.close()  # Cerrar el cursor después de realizar la operación
-
-
-def cambiar_estado_TAXI_ciudad_ok(conexion):
-    cursor = conexion.cursor()
-    cursor.execute("UPDATE taxis SET estado = 0")
-    conexion.commit()  # Asegurar que los cambios se guarden en la base de datos
-    cursor.close()  # Cerrar el cursor después de realizar la operación
+###===========================================================================
+###===========================================================================
