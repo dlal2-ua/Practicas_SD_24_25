@@ -365,11 +365,13 @@ def procesar_coordenadas_taxi(taxi_id, coordX_taxi_, coordY_taxi_, broker):
     # Si el taxi no tiene un estado inicial, inicializarlo
     if taxi_id not in taxis_estados:
         taxis_estados[taxi_id] = []  # Inicializa la lista de estados para el taxi
+        print(taxis_estados)
 
     try:
         # Procesar clientes que están esperando ser recogidos por un taxi
         for cliente in clientes_a_mostrar_global[:]:  # Usar una copia de la lista
             cliente_id, destino, (coordX_cliente, coordY_cliente) = cliente
+
 
             # Verificar si el taxi ha llegado a la posición del cliente
             if abs(coordX_taxi_ - coordX_cliente) < 0.1 and abs(coordY_taxi_ - coordY_cliente) < 0.1:
@@ -490,7 +492,7 @@ def actualizar_tablero(ax, destinos, clientes):
         elif estado == 3:
             color_taxi = "red"    # Estado 3: taxi en rojo y añadir exclamación en el nombre (parado por central)
         elif estado == 4:
-            color_taxi = "red"    # Estado 4: taxi en rojo y añadir asterisco en el nombre (hay hielo volver base)
+            color_taxi = "blue"    # Estado 4: taxi en rojo y añadir asterisco en el nombre (hay hielo volver base)
 
         # Actualizar el texto del taxi, con exclamación si el estado es 3
         texto_taxi = f"{taxi_id}-{cliente_id}" if cliente_en_taxi != 0 else str(taxi_id)
@@ -518,9 +520,8 @@ def actualizar_tablero(ax, destinos, clientes):
 
 
 
-
-
-
+def temperatura_activa():
+    return True
 
 
 
@@ -550,16 +551,28 @@ def manejar_ciudad_invalida():
     # Opcional: puedes agregar lógica para resetear el estado o pedir al usuario que introduzca otra ciudad.
 
 
+def congelar_clientes():
+    global tabla_cliente
+    with lock_clientes:
+        if not tabla_cliente.empty:
+            # Cambiar el estado de todos los clientes directamente
+            tabla_cliente['ESTADO'] = "CONGELADO"
+            print("\nTodos los clientes han sido actualizados a estado CONGELADO.")
+        else:
+            print("\nNo hay clientes en la tabla para congelar.")
+
+        # Imprimir la tabla actualizada
+        imprimir_tabla_clientes()
+
+
 
 def manejar_ciudad_ko():
-    broker = "127.0.0.1:9092"
+    broker = devuelve_broker()
     print("Mandando todos los taxis a la base...")
 
-    with lock_clientes:
-        # Actualizar el estado de todos los clientes a "CONGELADO"
-        tabla_cliente['ESTADO'] = "CONGELADO"
-        imprimir_tabla_clientes()
-    
+    congelar_clientes()
+    cambiarEstadoCliente("CONGELADO")
+
     try:
         # Leer los taxis desde la base de datos
         taxis = obtener_datos_TAXI_ciudad()
@@ -573,8 +586,7 @@ def manejar_ciudad_ko():
                 if estado in (0, 1, 2, 3):  # Estados que requieren cambiar el estado del taxi
                     cambiar_estado_TAXI_ciudad_ko(taxi_id)
                     actualizar_tabla_taxis(taxi_id)
-                    #print(f"El taxi {taxi_id} con estado {estado} ha sido actualizado debido a ciudad KO.")
-                    #volver_base(broker, taxi_id, coord_x, coord_y, destino)
+                    volver_base(broker, taxi_id, coord_x, coord_y, destino)
 
                 elif estado == 4:  #Dejo esta parte por si algun taxi ya esta en estado 4 nada mas entrar
                     volver_base(broker, taxi_id, coord_x, coord_y, destino)
@@ -764,6 +776,14 @@ def menu(broker):
         producer.flush()
         os._exit(1)  # Forzar la salida en caso de error
 
+
+def devuelve_broker():
+    if len(sys.argv) == 3:
+        ip_broker = sys.argv[1]
+        puerto_broker = sys.argv[2]
+        global broker
+        broker = f'{ip_broker}:{puerto_broker}'
+        return broker
 
 # Función principal unificada
 def main():

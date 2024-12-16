@@ -169,7 +169,8 @@ def actualizar_tabla_taxis(taxi_id):
             estado_actual = (
                 "DISPONIBLE" if estado == 1 and destino_a_cliente is None else
                 f"HACIA ({'CLIENTE' if pasajero == 0 else 'DESTINO'})" if estado == 0 else
-                "PARADO"
+                "PARADO" if estado != 4 else
+                "CONGELADO"
             )
             
             # Verificar si el taxi ya está en la tabla
@@ -340,7 +341,7 @@ def hilo_lector_taxis(broker):
                     parado_sensor(taxi_id)
 
                 nueva_pos_taxi(taxi_id,coordX_taxi,coordY_taxi)
-                actualizar_tabla_taxis(taxi_id)
+#                actualizar_tabla_taxis(taxi_id)
                 
                 #print(f"Taxi ID: {taxi_id}, Coordenadas: ({coordX_taxi}, {coordY_taxi})")
 
@@ -404,7 +405,9 @@ def procesar_coordenadas_taxi(taxi_id, coordX_taxi_, coordY_taxi_, broker):
                 continue  # Continuar al siguiente cliente
 
         # Agregar el estado del taxi a la lista de estados
+        
         taxis_estados[taxi_id].append((coordX_taxi_, coordY_taxi_, 0, None))  # Inicialmente, el taxi está en movimiento sin cliente
+
 
         # Procesar clientes que están en trayecto en el taxi
         for cliente_id, destino, taxi_asignado in clientes_en_taxi_global:
@@ -482,16 +485,20 @@ def actualizar_tablero(ax, destinos, clientes):
 
         # Definir color según el estado del taxi
         if estado == 0:
-            color_taxi = "green"  # Estado 0: taxi en verde
+            color_taxi = "green"  # Estado 0: taxi en verde (en servicio)
         elif estado in [1, 2]:
-            color_taxi = "red"    # Estado 1 o 2: taxi en rojo
+            color_taxi = "red"    # Estado 1 o 2: taxi en rojo (parado por sensor)
         elif estado == 3:
-            color_taxi = "red"    # Estado 3: taxi en rojo y añadir exclamación en el nombre
+            color_taxi = "red"    # Estado 3: taxi en rojo y añadir exclamación en el nombre (parado por central)
+        elif estado == 4:
+            color_taxi = "blue"    # Estado 4: taxi en rojo y añadir asterisco en el nombre (hay hielo volver base)
 
         # Actualizar el texto del taxi, con exclamación si el estado es 3
         texto_taxi = f"{taxi_id}-{cliente_id}" if cliente_en_taxi != 0 else str(taxi_id)
         if estado == 3:
             texto_taxi += "!"  # Añadir exclamación al nombre del taxi en estado 3
+        elif estado == 4:
+            texto_taxi += "*"
 
         # Representar el taxi en el tablero
         ax.add_patch(plt.Rectangle((coordX_taxi - 1, coordY_taxi - 1), 1, 1, color=color_taxi))
@@ -499,6 +506,116 @@ def actualizar_tablero(ax, destinos, clientes):
 
     plt.draw()
     plt.pause(0.01)
+
+
+
+
+
+
+
+
+
+
+
+
+
+def temperatura():
+    try:
+        # Obtener la temperatura
+        temp = CENTRA_prueba_dani.coger_temperatura()
+        
+        # Validar que sea un número
+        if not isinstance(temp, (int, float)):
+            raise ValueError("La temperatura obtenida no es un número.")
+
+        # Lógica según la temperatura
+        if temp < 0:
+            manejar_ciudad_ko()
+        else:
+            manejar_ciudad_ok()
+    except ValueError as ve:
+        print(f"Error: {ve}. La ciudad podría estar mal escrita.")
+        manejar_ciudad_invalida()
+    except Exception as e:
+        print(f"Error inesperado al obtener la temperatura: {e}")
+        manejar_ciudad_invalida()
+
+def manejar_ciudad_invalida():
+    print("La ciudad introducida no es válida. Por favor, verifica el nombre e inténtalo de nuevo.")
+    # Opcional: puedes agregar lógica para resetear el estado o pedir al usuario que introduzca otra ciudad.
+
+
+def congelar_clientes():
+    global tabla_cliente
+    with lock_clientes:
+        if not tabla_cliente.empty:
+            # Cambiar el estado de todos los clientes directamente
+            tabla_cliente['ESTADO'] = "CONGELADO"
+            print("\nTodos los clientes han sido actualizados a estado CONGELADO.")
+        else:
+            print("\nNo hay clientes en la tabla para congelar.")
+
+        # Imprimir la tabla actualizada
+        imprimir_tabla_clientes()
+
+
+
+def manejar_ciudad_ko():
+    broker = devuelve_broker()
+    print("Mandando todos los taxis a la base...")
+
+    congelar_clientes()
+    cambiarEstadoClientes("CONGELADO")
+
+    try:
+        # Leer los taxis desde la base de datos
+        taxis = obtener_datos_TAXI_ciudad()
+        print("Procesando taxis...")
+
+        if taxis:  # Comprobamos si hay taxis en la base de datos
+            for taxi in taxis:
+                taxi_id, coord_x, coord_y, destino, estado = taxi
+                
+                print(f"Procesando taxi {taxi_id}...")
+
+                if estado in (0, 1, 2, 3):  # Estados que requieren cambiar el estado del taxi
+                    cambiar_estado_TAXI_ciudad_ko(taxi_id)
+                    actualizar_tabla_taxis(taxi_id)
+                    volver_base(broker, taxi_id, coord_x, coord_y, destino)
+                elif estado == 4:
+                    print(f"Taxi {taxi_id} ya está en estado 4, volviendo a la base.")
+                    volver_base(broker, taxi_id, coord_x, coord_y, destino)
+
+                
+        else:
+            print("No hay taxis disponibles en la base de datos para procesar.")
+    except Exception as e:
+        print(f"Error al procesar los taxis: {e}")
+
+
+
+
+def manejar_ciudad_ok():
+    print("comeme el nabo...")
+    cambiar_estado_TAXI_ciudad_ok()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -596,48 +713,81 @@ def menu(broker):
         while True:
             mensaje = input()
             print(Fore.LIGHTMAGENTA_EX + "------------MENU-----------")
-            print(Fore.LIGHTMAGENTA_EX +"a. Parar")
-            print(Fore.LIGHTMAGENTA_EX +"b. Reanudar")
-            print(Fore.LIGHTMAGENTA_EX +"c. Ir a destino")
-            print(Fore.LIGHTMAGENTA_EX +"d. Volver a la base")
-            respuesta = input()
+            print(Fore.LIGHTMAGENTA_EX + "a. Parar")
+            print(Fore.LIGHTMAGENTA_EX + "b. Reanudar")
+            print(Fore.LIGHTMAGENTA_EX + "c. Ir a destino")
+            print(Fore.LIGHTMAGENTA_EX + "d. Volver a la base")
+            print(Fore.LIGHTMAGENTA_EX + "e. Mostrar menú CENTRA_prueba")
+            
+            # Bucle para asegurar que la respuesta sea válida
+            while True:
+                respuesta = input("Selecciona una opción: ")
+                if respuesta in ["a", "b", "c", "d", "e"]:
+                    break  # Salir del bucle si la opción es válida
+                else:
+                    print(Fore.RED + "Opción no válida. Por favor, selecciona una opción válida entre a, b, c, d o e.")
+
             if respuesta == "a":
                 print("Elige el taxi que quieres parar:")
                 t1 = input()
                 if buscar_taxi_activo(int(t1)):
-                    para(broker,t1,coordX_taxi(t1),coordY_taxi(t1),obtener_cliente(t1))
+                    para(broker, t1, coordX_taxi(t1), coordY_taxi(t1), obtener_cliente(t1))
                 else:
-                    print(f"El taxi {t1} no esta autentificado")
+                    print(f"El taxi {t1} no está autentificado")
+
             elif respuesta == "b":
                 print("Elige el taxi que quieres poner en marcha:")
                 t2 = input()
                 if buscar_taxi_activo(int(t2)):
-                    reanudar(broker,t2,coordX_taxi(t2),coordY_taxi(t2),obtener_cliente(t2))
+                    reanudar(broker, t2, coordX_taxi(t2), coordY_taxi(t2), obtener_cliente(t2))
                 else:
-                    print(f"El taxi {t2} no esta autentificado")
+                    print(f"El taxi {t2} no está autentificado")
                 
             elif respuesta == "c":
-                print("Elige el taxi que quieres cambiar el destino")
+                print("Elige el taxi que quieres cambiar el destino:")
                 t3 = input()
                 if buscar_taxi_activo(int(t3)):
-                    ir_destino(broker,t3,coordX_taxi(t3),coordY_taxi(t3),obtener_cliente(t3))
+                    ir_destino(broker, t3, coordX_taxi(t3), coordY_taxi(t3), obtener_cliente(t3))
                 else:
-                    print(f"El taxi {t3} no esta disponible")
+                    print(f"El taxi {t3} no está disponible")
+
             elif respuesta == "d":
-                print("Elige el taxi que quieres que vuelva a base")
+                print("Elige el taxi que quieres que vuelva a base:")
                 t4 = input()
                 if buscar_taxi_activo(int(t4)):
-                    volver_base(broker,t4,coordX_taxi(t4),coordY_taxi(t4),obtener_cliente(t4))
+                    print("hola")
+                    #volver_base(broker, t4, coordX_taxi(t4), coordY_taxi(t4), obtener_cliente(t4))
                 else:
-                    print(f"El taxi {t4} no esta disponible")
+                    print(f"El taxi {t4} no está disponible")
+
+            elif respuesta == "e":
+                # Llamar al menú de CENTRA_prueba_dani
+                print(Fore.LIGHTCYAN_EX + "--- Menú de CENTRA_prueba ---")
+                CENTRA_prueba_dani.menu()
+                t5 = input("Selecciona una opción: ")  # Opción elegida por el usuario
+                CENTRA_prueba_dani.controlador_menu(t5)  # Llamar a la función
+                
+
     except OSError:
-        print("Tienes que poner un numero en el taxi")
+        print("Tienes que poner un número en el taxi")
     except EOFError:
         producer = KafkaProducer(bootstrap_servers=broker)
-        mensaje_confirmacion = "Central caida"
+        mensaje_confirmacion = "Central caída"
         producer.send('CENTRAL-CAIDA', value=mensaje_confirmacion.encode('utf-8'))
         producer.flush()
         os._exit(1)  # Forzar la salida en caso de error
+
+
+
+def devuelve_broker():
+    if len(sys.argv) == 3:
+        ip_broker = sys.argv[1]
+        puerto_broker = sys.argv[2]
+        global broker
+        broker = f'{ip_broker}:{puerto_broker}'
+        return broker
+
+
 
 # Función principal unificada
 def main():

@@ -217,6 +217,8 @@ def cambiarEstadoCliente(conexion, id, estado):
         print(f"Error al actualizar estado del cliente en la base de datos: {e}")
 
 
+
+
 def agregarCoordCliente(conexion, id, coordX, coordY):
     try:
         cursor = conexion.cursor()
@@ -389,3 +391,12 @@ def obtener_datos_TAXI_ciudad():
     cursor.close()
     conexion.close()
     return taxi
+
+def cambiarEstadoCliente(estado):
+    conexion = conectar_bd()
+    try:
+        cursor = conexion.cursor()
+        cursor.execute("UPDATE clientes SET estado = %s", (estado,))
+        conexion.commit()
+    except mysql.connector.Error as e:
+        print(f"Error al actualizar estado del cliente en la base de datos: {e}")
