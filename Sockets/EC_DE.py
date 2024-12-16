@@ -5,6 +5,7 @@ import sys
 from kafka import KafkaConsumer, KafkaProducer
 from funciones_generales import *
 import os
+import requests
 
 HEADER = 64
 SERVER = socket.gethostbyname(socket.gethostname())
@@ -86,6 +87,7 @@ def enviar_central(id_taxi,broker,pasajero):
                     dibujar_mapa()
 
     except KeyboardInterrupt:
+        print("sale enviar central")
         exit(1)
     producer.close()
 
@@ -174,7 +176,16 @@ def handle_server():
                     message = idTaxi.encode(FORMAT)
                     client.sendall(message)
                 elif r =="1":
-                    print("hila")
+                    url = 'https://localhost:3000/taxis'
+                    data = {'id': idTaxi}
+
+                    try:
+                        response = requests.post(url, json=data)
+                        response.raise_for_status()  # Lanza una excepción si ocurre un error HTTP
+                        print('Código de respuesta:', response.status_code)
+                        print('Respuesta del servidor:', response.json())
+                    except requests.exceptions.RequestException as error:
+                        print('Error:', error)
                 elif r== "2":
                     print("Dar de baja")
                 break
@@ -199,6 +210,11 @@ def servidor(broker):
             except OSError:
                 PORT += 1
     except KeyboardInterrupt:
+        producercliente = KafkaProducer( bootstrap_servers=broker,)
+        mensaje_cliente = f"ID:{obtener_cliente(sys.argv[5])} KO"
+        producercliente.send('TAXI-CLIENTE',value=mensaje_cliente.encode('utf-8'))
+        sacar_taxi(int(sys.argv[5]))
+        sacar_token(int(sys.argv[5]))
         os._exit(1)
 
 
@@ -291,12 +307,15 @@ if __name__ == "__main__":
             hilo_servidor = threading.Thread(target= servidor(broker))
             hilo_servidor.start()
         except KeyboardInterrupt:
+            print("saca taxi")
             try:
                 producercliente = KafkaProducer( bootstrap_servers=broker,)
                 mensaje_cliente = f"ID:{obtener_cliente(sys.argv[5])} KO"
                 producercliente.send('TAXI-CLIENTE',value=mensaje_cliente.encode('utf-8'))
                 sacar_taxi(int(sys.argv[5]))
+                sacar_token(int(sys.argv[5]))
             except KeyboardInterrupt:
+                print("sale segundo keyinterrup")
                 os._exit(1)
 
     

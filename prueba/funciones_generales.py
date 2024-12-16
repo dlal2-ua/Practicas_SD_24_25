@@ -11,7 +11,7 @@ from sqlalchemy import create_engine
 def conectar_bd():
     conexion = mysql.connector.connect(
         host="localhost",  # Cambia por la IP del servidor MySQL si es remoto
-        user="mysqlSD",  # Usuario de MySQL
+        user="root",  # Usuario de MySQL
         password="1234",  # Contraseña configurada
         database="bbdd"  # Nombre de la base de datos
     )
@@ -21,7 +21,7 @@ def conectar_bd():
 
 # Configuración global para SQLAlchemy
 def obtener_engine():
-    usuario = "mysqlSD"
+    usuario = "root"
     contraseña = "1234"
     servidor = "localhost"
     puerto = "3306"
@@ -53,6 +53,7 @@ def coordY_taxi(id_taxi):
     cursor.close()
     conexion.close()
     return int(coordenada)
+
 def sacar_taxi(id_taxi):
     conexion = conectar_bd()
     cursor = conexion.cursor()

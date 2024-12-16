@@ -1,6 +1,6 @@
 const https = require('https'); 
 const express = require("express"); 
-const sqlite3= require ("sqlite3").verbose(); 
+const mysql = require("mysql")
 const fs = require('fs'); 
 
 const bodyParser = require("body-parser"); 
@@ -24,23 +24,21 @@ https
     .listen(port, () => { 
         console.log("https API Server listening: "+port); 
     });
-
+/*
 const db = new sqlite3.Database("database.db", (err) => {
     if (err) {
         console.error("Error al conectar con la base de datos:", err.message);
         return;
     }
     console.log("Conexión a la base de datos SQLite correcta");
-});
-
+});*/
+const connection = mysql.createConnection({ 
+    host: 'localhost', 
+    user:'root', 
+    password: '1234', 
+    database:'bbdd' 
+    }); 
 appSD.use(bodyParser.json());
-
-
-// Se define el puerto 
-
-appSD.get("/",(req, res) => { res.json({message:'Página de inicio de aplicación de ejemplo de SD'}) 
-}); 
-
 
 
 // Listado de todos los usuarios 
@@ -50,14 +48,15 @@ appSD.get("/taxis", (request, response) => {
     // Consulta para obtener toda la información de la tabla taxis
     const sql = 'SELECT * FROM taxis';
 
-    // Ejecutar la consulta en la base de datos SQLite
-    db.all(sql, [], (error, rows) => {
+    // Ejecutar la consulta en la base de datos MySQL
+    connection.query(sql, (error, rows) => {
         if (error) {
             console.error("Error ejecutando la consulta:", error.message);
             response.status(500).send("Error en la base de datos");
             return;
         }
 
+        // Verificar si hay resultados
         if (rows.length > 0) {
             response.json(rows); // Devolver los resultados como JSON
         } else {
@@ -73,7 +72,7 @@ appSD.get("/taxis/:id", (request, response) => {
     const sql = 'SELECT * FROM taxis WHERE id = ?';
 
     // Ejecutar la consulta en la base de datos SQLite
-    db.get(sql, [id], (error, row) => {
+    connection.query(sql,(error,rows) => {
         if (error) {
             console.error("Error ejecutando la consulta:", error.message);
             response.status(500).send("Error en la base de datos");
@@ -81,7 +80,7 @@ appSD.get("/taxis/:id", (request, response) => {
         }
 
         if (row) {
-            response.json(row); // Devolver el resultado como JSON
+            response.json(rows); // Devolver el resultado como JSON
         } else {
             response.status(404).send("Taxi no encontrado");
         }
@@ -101,7 +100,7 @@ appSD.post("/taxis", (request, response) => {
     }
 
     // Ejecutar la consulta
-    db.run(sql, [id], function (error) {
+    connection.query(sql,(error,response) => {
 
         if (error) {
             if(error.message == "SQLITE_CONSTRAINT: UNIQUE constraint failed: taxis.id") {
@@ -125,7 +124,7 @@ appSD.delete("/taxis/:id", (request, response) => {
     const sql = "DELETE FROM taxis WHERE id = ?";
 
     // Ejecutar la consulta
-    db.run(sql, [id], function (error) {
+    connection.query(sql,(error,response) => {
         if (error) {
             console.error("Error al eliminar en la base de datos:", error.message);
             return response.status(500).send("Error en la base de datos");

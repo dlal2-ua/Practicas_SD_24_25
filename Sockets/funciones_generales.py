@@ -30,7 +30,7 @@ def conectar_bd2():
 
 # Configuración global para SQLAlchemy
 def obtener_engine():
-    usuario = "mysqlSD"
+    usuario = "root"
     contraseña = "1234"
     servidor = "localhost"
     puerto = "3306"
@@ -71,6 +71,15 @@ def coordY_taxi(id_taxi):
     cursor.close()
     conexion.close()
     return int(coordenada)
+
+def sacar_token(id_taxi):
+    conexion = conectar_bd()
+    cursor = conexion.cursor()
+    cursor.execute(f"Delete from encriptado WHERE taxi = {id_taxi}")
+    conexion.commit()
+    cursor.close()
+    conexion.close()
+
 def sacar_taxi(id_taxi):
     conexion = conectar_bd()
     cursor = conexion.cursor()
@@ -100,6 +109,17 @@ def buscar_taxi_activo(msg):
     df_busqueda = pd.read_sql_query(query, engine)
     return not df_busqueda.empty  # Retorna True si encuentra el taxi, False si no
     
+def asignarToken(id_taxi):
+    token = secrets.token_hex(16)
+    conexion = conectar_bd()
+    cursor = conexion.cursor()
+    conexion = conectar_bd()
+    cursor = conexion.cursor()
+    cursor.execute("INSERT INTO encriptado (taxi, token, clave) VALUES (%s, %s, %s)", (id_taxi, token, 2))
+    conexion.commit()
+    cursor.close()
+    conexion.close()  
+
 def autentificar_taxi(id_taxi):
     conexion = conectar_bd()
     cursor = conexion.cursor()
@@ -107,14 +127,9 @@ def autentificar_taxi(id_taxi):
     conexion.commit()
     cursor.close()
     conexion.close()
-    conexion = conectar_bd()
-    cursor = conexion.cursor()
-    cursor.execute("INSERT INTO encriptado (taxi) VALUES (?)", (id_taxi,))
-    conexion.commit()
-    cursor.close()
-    conexion.close()
 
-"""
+
+
 def buscar_taxi_arg(msg):
     engine = obtener_engine()
     query = f"SELECT id FROM taxis WHERE id = {msg} AND estado IS NULL"

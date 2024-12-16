@@ -15,7 +15,7 @@ conexion = mysql.connector.connect(
 cursor = conexion.cursor()
 
 cursor.execute('''
-    DROP TABLE IF EXISTS taxis, clientes, pos_inicial_cliente, destinos
+    DROP TABLE IF EXISTS taxis, clientes, pos_inicial_cliente, destinos,encriptado
     ''')
 
 
