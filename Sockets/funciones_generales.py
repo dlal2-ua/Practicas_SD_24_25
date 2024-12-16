@@ -1,6 +1,8 @@
 import mysql.connector
 import pandas as pd
 from sqlalchemy import create_engine
+import pymysql
+import secrets
 
 
 #================================================================================================
@@ -9,15 +11,31 @@ from sqlalchemy import create_engine
 def conectar_bd():
     conexion = mysql.connector.connect(
         host="localhost",  # Cambia por la IP del servidor MySQL si es remoto
-        user="mysqlSD",  # Usuario de MySQL
+        user="root",  # Usuario de MySQL
         password="1234",  # Contraseña configurada
         database="bbdd"  # Nombre de la base de datos
     )
     
     return conexion
+def conectar_bd2():
+    host="localhost"  # Cambia por la IP del servidor MySQL si es remoto
+    user="root"  # Usuario de MySQL
+    password="1234"  # Contraseña configurada
+    database="bbdd"  # Nombre de la base de datos
+    engine = create_engine(f"mysql+pymysql://{user}:{password}@{host}/{database}")
+    return engine
 
 #================================================================================================
+def generarToken(id):
+    conexion = conectar_bd()
+    cursor = conexion.cursor()
+    token = secrets.token_hex(16)
+    cursor.execute(f"UPDATE encriptado SET taxis = (?) WHERE id = (?)",(id,token,))
+    conexion.commit()
+    conexion.close()
 
+
+#================================================================================================
 def coordX_taxi(id_taxi):
     conexion = conectar_bd()
     cursor = conexion.cursor()
@@ -82,8 +100,14 @@ def autentificar_taxi(id_taxi):
     conexion.commit()
     cursor.close()
     conexion.close()
+    conexion = conectar_bd()
+    cursor = conexion.cursor()
+    cursor.execute("INSERT INTO encriptado (taxi) VALUES (?)", (id_taxi,))
+    conexion.commit()
+    cursor.close()
+    conexion.close()
 
-
+"""
 def buscar_taxi_arg(msg):
     conexion = conectar_bd()
     query = f"SELECT id FROM taxis WHERE id == {msg} AND estado IS NULL"
@@ -94,6 +118,22 @@ def buscar_taxi_arg(msg):
     else:
         conexion.close()
         return True
+"""
+def buscar_taxi_arg(msg):
+    conexion = conectar_bd2()
+    try:
+        # Nota: Usamos un parámetro en lugar de interpolación para evitar SQL injection
+        query = "SELECT id FROM taxis WHERE id = %s AND estado IS NULL"
+        df_busqueda = pd.read_sql_query(query, conexion, params=(msg,))
+        
+        # Verificar si el DataFrame está vacío
+        if df_busqueda.empty:
+            return False
+        else:
+            return True
+    finally:
+        # Asegurar que la conexión siempre se cierre
+        conexion.dispose()
 def obtener_cliente(id):
     conexion = conectar_bd()
     cursor = conexion.cursor()
@@ -227,7 +267,7 @@ def agregarCoordCliente(conexion, id, coordX, coordY):
 
 def obtener_destinos(conexion):
     # Configuración del motor SQLAlchemy para MySQL
-    usuario = "mysqlSD"
+    usuario = "root"
     contraseña = "1234"
     servidor = "localhost"  # Cambia esto si tu servidor es remoto
     puerto = "3306"         # Puerto por defecto de MySQL

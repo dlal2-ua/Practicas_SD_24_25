@@ -158,13 +158,25 @@ def handle_server():
         global autentificado
         autentificado = False
         contador = 0
+        idTaxi = sys.argv[5]
         while True:
-            try:                
-                client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                client.connect(ADDR_CLIENT)
-                idTaxi = sys.argv[5]
-                message = idTaxi.encode(FORMAT)
-                client.sendall(message)
+            try:     
+                r = ""    
+                while r != "1" and r != "2" and r != "3":
+                    print("--------------------Menu-------------------")
+                    print("1. Registrar el taxi")
+                    print("2. Dar de baja el taxi")
+                    print("3. Comenzar recorrido")
+                    r = input()
+                if r == "3":
+                    client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    client.connect(ADDR_CLIENT)
+                    message = idTaxi.encode(FORMAT)
+                    client.sendall(message)
+                elif r =="1":
+                    print("hila")
+                elif r== "2":
+                    print("Dar de baja")
                 break
             except ConnectionRefusedError:
                     if contador == 0:
@@ -197,10 +209,10 @@ def start(broker):
     global parar_hilo_enviar_coord
     global msg_sensor
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    
     ADDR=(SERVER,PORT)
+    print(ADDR)
     server.bind(ADDR)
-    print(f"Puerto en el que está escuchando: {PORT}")
-    print(f"Servidor escuchando en {SERVER}")
     server.listen()
 
     while True:
