@@ -7,7 +7,7 @@ import mysql.connector
 # Conectar a la base de datos MySQL
 conexion = mysql.connector.connect(
     host="localhost",  # Cambia por la IP del servidor si es remoto
-    user="mysqlSD",       # Usuario de MySQL
+    user="root",       # Usuario de MySQL
     password="1234",  # Contraseña configurada
     database="bbdd"  # Nombre de la base de datos
 )
@@ -15,7 +15,7 @@ conexion = mysql.connector.connect(
 cursor = conexion.cursor()
 
 cursor.execute('''
-    DROP TABLE IF EXISTS taxis, clientes, pos_inicial_cliente, destinos
+    DROP TABLE IF EXISTS taxis, clientes, pos_inicial_cliente, destinos,encriptado
     ''')
 
 # Crear las tablas
@@ -48,7 +48,13 @@ CREATE TABLE IF NOT EXISTS pos_inicial_cliente (
     coordY INT NOT NULL
 )
 ''')
-
+cursor.execute('''
+CREATE TABLE IF NOT EXISTS encriptado (
+    taxi INT PRIMARY KEY,
+    token VARCHAR(64) NOT NULL,
+    clave FLOAT NOT NULL
+)
+''')
 cursor.execute('''
 CREATE TABLE IF NOT EXISTS destinos (
     destino VARCHAR(255) PRIMARY KEY,

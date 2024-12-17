@@ -684,6 +684,7 @@ def handle_client(conn, addr,broker):
     msg = conn.recv(1024).decode(FORMAT)
     if buscar_taxi_arg(msg):
         autentificar_taxi(msg)
+        asignarToken(msg)
         print(f"El taxi con id {msg} está autentificado")
         conn.send("Taxi correctamente autentificado".encode(FORMAT))
 

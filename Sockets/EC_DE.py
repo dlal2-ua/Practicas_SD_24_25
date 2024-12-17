@@ -5,6 +5,7 @@ import sys
 from kafka import KafkaConsumer, KafkaProducer
 from funciones_generales import *
 import os
+import requests
 
 HEADER = 64
 SERVER = socket.gethostbyname(socket.gethostname())
@@ -86,6 +87,7 @@ def enviar_central(id_taxi,broker,pasajero):
                     dibujar_mapa()
 
     except KeyboardInterrupt:
+        print("sale enviar central")
         exit(1)
     producer.close()
 
@@ -158,13 +160,34 @@ def handle_server():
         global autentificado
         autentificado = False
         contador = 0
+        idTaxi = sys.argv[5]
         while True:
-            try:                
-                client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                client.connect(ADDR_CLIENT)
-                idTaxi = sys.argv[5]
-                message = idTaxi.encode(FORMAT)
-                client.sendall(message)
+            try:     
+                r = ""    
+                while r != "1" and r != "2" and r != "3":
+                    print("--------------------Menu-------------------")
+                    print("1. Registrar el taxi")
+                    print("2. Dar de baja el taxi")
+                    print("3. Comenzar recorrido")
+                    r = input()
+                if r == "3":
+                    client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    client.connect(ADDR_CLIENT)
+                    message = idTaxi.encode(FORMAT)
+                    client.sendall(message)
+                elif r =="1":
+                    url = 'https://localhost:3000/taxis'
+                    data = {'id': idTaxi}
+
+                    try:
+                        response = requests.post(url, json=data)
+                        response.raise_for_status()  # Lanza una excepción si ocurre un error HTTP
+                        print('Código de respuesta:', response.status_code)
+                        print('Respuesta del servidor:', response.json())
+                    except requests.exceptions.RequestException as error:
+                        print('Error:', error)
+                elif r== "2":
+                    print("Dar de baja")
                 break
             except ConnectionRefusedError:
                     if contador == 0:
@@ -187,6 +210,11 @@ def servidor(broker):
             except OSError:
                 PORT += 1
     except KeyboardInterrupt:
+        producercliente = KafkaProducer( bootstrap_servers=broker,)
+        mensaje_cliente = f"ID:{obtener_cliente(sys.argv[5])} KO"
+        producercliente.send('TAXI-CLIENTE',value=mensaje_cliente.encode('utf-8'))
+        sacar_taxi(int(sys.argv[5]))
+        sacar_token(int(sys.argv[5]))
         os._exit(1)
 
 
@@ -197,10 +225,10 @@ def start(broker):
     global parar_hilo_enviar_coord
     global msg_sensor
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    
     ADDR=(SERVER,PORT)
+    print(ADDR)
     server.bind(ADDR)
-    print(f"Puerto en el que está escuchando: {PORT}")
-    print(f"Servidor escuchando en {SERVER}")
     server.listen()
 
     while True:
@@ -279,12 +307,15 @@ if __name__ == "__main__":
             hilo_servidor = threading.Thread(target= servidor(broker))
             hilo_servidor.start()
         except KeyboardInterrupt:
+            print("saca taxi")
             try:
                 producercliente = KafkaProducer( bootstrap_servers=broker,)
                 mensaje_cliente = f"ID:{obtener_cliente(sys.argv[5])} KO"
                 producercliente.send('TAXI-CLIENTE',value=mensaje_cliente.encode('utf-8'))
                 sacar_taxi(int(sys.argv[5]))
+                sacar_token(int(sys.argv[5]))
             except KeyboardInterrupt:
+                print("sale segundo keyinterrup")
                 os._exit(1)
 
     
