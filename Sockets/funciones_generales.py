@@ -419,10 +419,10 @@ def cambiar_estado_TAXI_ciudad_ko(taxi_id):
     cursor.close()  # Cerrar el cursor después de realizar la operación
 
 
-def cambiar_estado_TAXI_ciudad_ok():
+def cambiar_estado_TAXI_ciudad_ok(taxi_id):
     conexion = conectar_bd()
     cursor = conexion.cursor()
-    cursor.execute("UPDATE taxis SET estado = 0")
+    cursor.execute("UPDATE taxis SET estado = 0where id = %s", (taxi_id,))
     conexion.commit()  # Asegurar que los cambios se guarden en la base de datos
     cursor.close()  # Cerrar el cursor después de realizar la operación
 
@@ -458,3 +458,11 @@ def obtener_coord_cliente(cliente_id):
     cursor.execute("SELECT coordX, coordY FROM clientes WHERE id = %s", (cliente_id,))
     resultado = cursor.fetchone()
     return resultado
+
+def poner_taxi_disponible(taxi_id):
+    conexion = conectar_bd()
+    cursor = conexion.cursor()
+    cursor.execute("UPDATE taxis SET estado = 1 WHERE id = %s", (taxi_id,))
+    conexion.commit()
+    cursor.close()
+    conexion.close()

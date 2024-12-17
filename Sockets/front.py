@@ -6,6 +6,20 @@ from funciones_generales import conectar_bd
 app = Flask(__name__)
 CORS(app)  # Habilitar CORS para el frontend
 
+# Lista para almacenar los logs
+logs = []
+
+@app.route('/api/logs', methods=['POST'])
+def recibir_logs():
+    log = request.json.get("log", "")
+    if log:
+        logs.append(log)
+        print(f"Log recibido: {log}")
+    return jsonify({"status": "success"}), 200
+
+@app.route('/api/obtener_logs', methods=['GET'])
+def obtener_logs():
+    return jsonify({"logs": logs})
 
 # Ruta principal para servir el HTML
 @app.route('/')

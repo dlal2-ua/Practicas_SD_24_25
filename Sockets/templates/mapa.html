@@ -103,6 +103,7 @@
     
         /* Colores para los elementos */
         .taxi { background-color: red; color: white; }
+        .taxi-verde { background-color: green; color: white; } /* Añadimos la clase verde */
         .cliente { background-color: yellow; color: black; }
         .destino { background-color: darkblue; color: white; }
     
@@ -182,12 +183,13 @@
             <div id="mapa" class="grid"></div>
         </div>
     </div>
-     <!-- Contenedor de Logs -->
-     <div class="contenedor-logs">
-        <h3>Logs:</h3>
-        <div class="logs" id="logs">
-            <p>No hay logs disponibles...</p>
-        </div>
+    <!-- Contenedor de Logs -->
+    <div class="contenedor-logs">
+    <h3>Logs:</h3>
+    <button id="clear-logs" style="margin-bottom: 10px;">Limpiar Logs</button>
+    <div class="logs" id="logs">
+        <p>No hay logs disponibles...</p>
+    </div>
     </div>
 
     <script>
@@ -226,36 +228,85 @@
                 case 1: return "disponible";
                 case 2: return "parado";
                 case 3: return "parado por central";
+                case 4: return "congelado";
                 default: return "inactivo";
             }
         }
 
 
         // Dibujar datos en el mapa
+        // Dibujar datos en el mapa
         function dibujarDatos(datos) {
             const cells = document.querySelectorAll('.cell');
             cells.forEach(cell => {
-                cell.className = 'cell';
-                cell.textContent = '';
+                cell.className = 'cell'; // Reseteamos la clase de todas las celdas
+                cell.textContent = '';    // Limpiamos el contenido de las celdas
             });
 
+            // Primero dibujamos los taxis
             datos.forEach(item => {
                 const index = (item.y - 1) * 20 + (item.x - 1);
                 const cell = cells[index];
                 if (cell) {
                     if (item.tipo === "taxi") {
-                        cell.classList.add('taxi');
-                        cell.textContent = `${item.id}`;
-                    } else if (item.tipo === "cliente") {
-                        cell.classList.add('cliente');
-                        cell.textContent = `${item.id}`;
-                    } else if (item.tipo === "destino") {
+                        // Si el taxi tiene estado 0, se pinta de verde
+                        if (item.estado === 0) {
+                            cell.classList.add('taxi', 'taxi-verde'); // Añadimos clase 'taxi-verde'
+                        } else {
+                            cell.classList.add('taxi');
+                        }
+
+                        // Comprobar si el cliente está en las mismas coordenadas que el taxi
+                        const cliente = datos.find(cliente => cliente.tipo === 'cliente' && 
+                            cliente.x === item.x && 
+                            cliente.y === item.y &&
+                            cliente.id === item.destino_a_cliente); // Verificamos que el cliente es el correcto
+
+                        if (cliente) {
+                            cell.textContent = `${item.id}-${cliente.id}`; // Mostrar "id del taxi-id del cliente"
+                            
+                            // Limpiar al cliente del mapa (eliminamos la celda correspondiente)
+                            const clienteCell = document.querySelector(`[data-index="${(cliente.y - 1) * 20 + (cliente.x - 1)}"]`);
+                            if (clienteCell) {
+                                clienteCell.textContent = ''; // Limpiamos la celda del cliente
+                            }
+                        } else {
+                            cell.textContent = `${item.id}`; // Solo mostramos el id del taxi
+                        }
+                    }
+                }
+            });
+
+            // Luego, dibujamos los clientes, asegurándonos de que no estén en la misma posición que un taxi
+            datos.forEach(item => {
+                if (item.tipo === "cliente") {
+                    const taxiEnPosicion = datos.find(taxi => taxi.tipo === 'taxi' && taxi.x === item.x && taxi.y === item.y);
+                    if (!taxiEnPosicion) {
+                        const index = (item.y - 1) * 20 + (item.x - 1);
+                        const cell = cells[index];
+                        if (cell) {
+                            cell.classList.add('cliente');
+                            cell.textContent = `${item.id}`;
+                        }
+                    }
+                }
+            });
+
+            // Finalmente, dibujamos los destinos
+            datos.forEach(item => {
+                if (item.tipo === "destino") {
+                    const index = (item.y - 1) * 20 + (item.x - 1);
+                    const cell = cells[index];
+                    if (cell) {
                         cell.classList.add('destino');
                         cell.textContent = `${item.nombre}`;
                     }
                 }
             });
         }
+
+
+
 
         // Actualizar tablas
         function actualizarTablas(datos) {
@@ -311,6 +362,38 @@
         }
 
         iniciarActualizacion();
+
+
+        async function cargarLogs() {
+            try {
+                // Endpoint de la API para obtener logs
+                const response = await fetch('http://localhost:5000/api/obtener_logs');
+                if (response.ok) {
+                    const data = await response.json();
+                    const logsContainer = document.getElementById('logs');
+                    
+                    // Actualizar los logs en el frontend
+                    if (data.logs.length > 0) {
+                        logsContainer.innerHTML = data.logs
+                            .map(log => `<p>${log}</p>`) // Crear un párrafo para cada log
+                            .join('');
+                    } else {
+                        logsContainer.innerHTML = '<p>No hay logs disponibles...</p>';
+                    }
+                } else {
+                    console.error("Error al obtener logs:", response.status);
+                }
+            } catch (error) {
+                console.error("Error en la conexión con la API:", error);
+            }
+        }
+
+        // Actualizar los logs cada segundo
+        setInterval(cargarLogs, 200);
+
+        // Evento para el botón de limpiar logs
+        document.getElementById('clear-logs').addEventListener('click', limpiarLogs);
+            
     </script>
 </body>
 </html>
