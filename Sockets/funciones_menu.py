@@ -70,10 +70,13 @@ def reanudar_no_congelado(broker, id_taxi, x, y, pasajero, destino_a_cliente, de
 
     # Determinar el destino del taxi
     if existe_pasajero(id_taxi):  # Caso: el pasajero ya está en el taxi
+        cambiarEstadoCliente(conexion, destino_a_cliente, "EN TAXI {}".format(id_taxi))
+
         destinos = obtener_destino_coords(conexion, destino_a_final)
         destinoX, destinoY = destinos[0], destinos[1]
         mensaje = f"{id_taxi},{destinoX},{destinoY},{pasajero},{x},{y},nada"
     else:  # Caso: el taxi debe recoger al pasajero
+        cambiarEstadoCliente(conexion, destino_a_cliente, "EN ESPERA")
         clienteX, clienteY = obtener_coord_cliente(destino_a_cliente)
         destinoX, destinoY = clienteX, clienteY
         mensaje = f"{id_taxi},{clienteX},{clienteY},{pasajero},{x},{y},nada"

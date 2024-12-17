@@ -573,14 +573,11 @@ def manejar_ciudad_ko():
     try:
         # Leer los taxis desde la base de datos
         taxis = obtener_datos_TAXI_ciudad()
-        print("Procesando taxis...")
 
         if taxis:  # Comprobamos si hay taxis en la base de datos
             for taxi in taxis:
                 taxi_id, coord_x, coord_y, destino_a_cliente, estado, pasajero, destino_a_final = taxi
                 
-                print(f"Procesando taxi {taxi_id}...")
-
                 if estado in (0, 1, 2, 3):  # Estados que requieren cambiar el estado del taxi
                     #cambiar_estado_TAXI_ciudad_ko(taxi_id)
                     volver_base(broker, taxi_id, coord_x, coord_y, destino_a_cliente)
@@ -597,16 +594,13 @@ def manejar_ciudad_ko():
 
 def manejar_ciudad_ok():
     broker = devuelve_broker()
-    print("comeme el nabo...")
     #cambiar_estado_TAXI_ciudad_ok()
-    print("hola")
+    
     try:
         taxis = obtener_datos_TAXI_ciudad()
         if taxis:  # Comprobamos si hay taxis en la base de datos
             for taxi in taxis:
-                print("adios")
                 taxi_id, coord_x, coord_y, destino_a_cliente, estado, pasajero, destino_a_final = taxi
-                print("peto")
                 if estado == 0:
                     reanudar_no_congelado(broker, taxi_id, coord_x, coord_y, pasajero, destino_a_cliente, destino_a_final)
     except Exception as e:
