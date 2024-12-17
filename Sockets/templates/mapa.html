@@ -2,15 +2,92 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Mapa Dinámico</title>
+    <title>Practica SD</title>
     <style>
-        /* Estilos para la cuadrícula */
+        /* Estilo general */
+        body {
+            display: flex;
+            flex-direction: row;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background-image: url(/static/templates/fondo_mapa.jpg);
+            background-size: cover; /* Asegura que la imagen cubra toda la pantalla */
+            background-position: center; /* Centra la imagen */
+        }
+
+    
+        h1 {
+            position: absolute;
+            top: 10px;
+            font-size: 24px;
+            color: #eee;
+        }
+    
+        /* Contenedor principal */
+        .contenedor-tablas-mapa {
+            display: flex;
+            flex-direction: row;
+            justify-content: center;
+            align-items: center;
+            width: 90%;
+            height: 80%;
+            gap: 20px;
+        }
+    
+        /* Contenedor de tablas (a la izquierda) */
+        .contenedor-tablas {
+            display: flex;
+            flex-direction: column;
+            width: 35%;
+            margin-left: 1%;
+            gap: 5px;
+        }
+    
+        .tabla-box {
+            width: 100%;
+            border: 2px solid #444;
+            background-color: #fff;
+            padding: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            border-radius: 5px;
+        }
+    
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: center;
+        }
+    
+        th, td {
+            border: 1px solid #ccc;
+            padding: 8px;
+        }
+    
+        th {
+            background-color: #444;
+            color: white;
+        }
+    
+        /* Contenedor del mapa (en el centro) */
+        .mapa-container {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+    
         .grid {
             display: grid;
             grid-template-columns: repeat(20, 30px);
             grid-template-rows: repeat(20, 30px);
-            border: 1px solid #ccc;
+            border: 2px solid #444;
+            width: 600px;
+            height: 600px;
         }
+    
         .cell {
             width: 30px;
             height: 30px;
@@ -20,27 +97,112 @@
             justify-content: center;
             font-size: 12px;
             font-weight: bold;
+            background-color: #fff;
+            opacity: 0.85;
         }
-        .taxi { background-color: red; color: white; text-align: center; }
-        .cliente { background-color: yellow; color: white; text-align: center; }
-        .destino { background-color: darkblue; color: white; text-align: center; }
+    
+        /* Colores para los elementos */
+        .taxi { background-color: red; color: white; }
+        .cliente { background-color: yellow; color: black; }
+        .destino { background-color: darkblue; color: white; }
+    
+        /* Contenedor de logs (a la derecha) */
+        .contenedor-logs {
+            width: 30%;
+            height: 80%;
+            border: 2px solid #444;
+            background-color: #fff;
+            padding: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            border-radius: 5px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-right: 1%;
+        }
+    
+        .logs {
+            flex: 1;
+            overflow-y: auto;
+            font-size: 14px;
+            color: #333;
+            border: 1px solid #ccc;
+            padding: 5px;
+            border-radius: 5px;
+        }
+    
+        h3 {
+            margin: 0;
+            text-align: center;
+        }
     </style>
+    
 </head>
 <body>
-    <h1>Mapa Dinámico</h1>
-    <div id="mapa" class="grid"></div>
+    <h1></h1>
+
+    <!-- Contenedor de tablas -->
+    <div class="contenedor-tablas-mapa">
+        <div class="contenedor-tablas">
+            <!-- Tabla de Taxis -->
+            <div class="tabla-box">
+                <h3>Tabla de Taxis:</h3>
+                <table id="tabla-taxis">
+                    <tr>
+                        <th>ID</th>
+                        <th>DESTINO</th>
+                        <th>ESTADO</th>
+                        <th>COORD_X</th>
+                        <th>COORD_Y</th>
+                    </tr>
+                    <tr>
+                        <td colspan="5">NO HAY DATOS</td>
+                    </tr>
+                </table>
+            </div>
+
+            <!-- Tabla de Clientes -->
+            <div class="tabla-box">
+                <h3>Tabla de Clientes:</h3>
+                <table id="tabla-clientes">
+                    <tr>
+                        <th>ID</th>
+                        <th>DESTINO</th>
+                        <th>ESTADO</th>
+                    </tr>
+                    <tr>
+                        <td colspan="3">NO HAY DATOS</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+
+        <!-- Contenedor del mapa -->
+        <div class="mapa-container">
+            <div id="mapa" class="grid"></div>
+        </div>
+    </div>
+     <!-- Contenedor de Logs -->
+     <div class="contenedor-logs">
+        <h3>Logs:</h3>
+        <div class="logs" id="logs">
+            <p>No hay logs disponibles...</p>
+        </div>
+    </div>
 
     <script>
         const mapa = document.getElementById('mapa');
+        const tablaTaxis = document.getElementById('tabla-taxis');
+        const tablaClientes = document.getElementById('tabla-clientes');
         const totalCeldas = 20 * 20;
 
         // Crear la cuadrícula una sola vez
         function crearCuadricula() {
-            mapa.innerHTML = ''; // Limpia cualquier contenido previo
+            mapa.innerHTML = '';
             for (let i = 0; i < totalCeldas; i++) {
                 const cell = document.createElement('div');
                 cell.classList.add('cell');
-                cell.dataset.index = i; // Asigna un índice para facilitar el acceso
+                cell.dataset.index = i;
                 mapa.appendChild(cell);
             }
         }
@@ -51,21 +213,34 @@
                 const response = await fetch('http://localhost:5000/api/mapa');
                 const datos = await response.json();
                 dibujarDatos(datos);
+                actualizarTablas(datos);
             } catch (error) {
                 console.error("Error al obtener los datos del mapa:", error);
             }
         }
 
-        // Función para dibujar datos en el mapa
+        // Función para asignar estados
+        function obtenerEstadoTaxi(estado) {
+            switch (estado) {
+                case 0: return "ocupado";
+                case 1: return "disponible";
+                case 2: return "parado";
+                case 3: return "parado por central";
+                default: return "inactivo";
+            }
+        }
+
+
+        // Dibujar datos en el mapa
         function dibujarDatos(datos) {
             const cells = document.querySelectorAll('.cell');
             cells.forEach(cell => {
-                cell.className = 'cell'; // Reiniciar las clases
-                cell.textContent = '';   // Limpiar el contenido
+                cell.className = 'cell';
+                cell.textContent = '';
             });
 
             datos.forEach(item => {
-                const index = item.y * 20 + item.x; // Calcula la posición
+                const index = (item.y - 1) * 20 + (item.x - 1);
                 const cell = cells[index];
                 if (cell) {
                     if (item.tipo === "taxi") {
@@ -82,14 +257,59 @@
             });
         }
 
-        // Actualizar el mapa cada 0.5 segundos
-        function iniciarActualizacion() {
-            crearCuadricula(); // Crear la cuadrícula al iniciar
-            cargarDatosMapa(); // Cargar los datos iniciales
-            setInterval(cargarDatosMapa, 500); // Actualizar cada 500 ms
+        // Actualizar tablas
+        function actualizarTablas(datos) {
+            const taxis = datos.filter(item => item.tipo === "taxi");
+            const clientes = datos.filter(item => item.tipo === "cliente");
+
+            tablaTaxis.innerHTML = `
+                <tr>
+                    <th>ID</th>
+                    <th>DESTINO</th>
+                    <th>ESTADO</th>
+                    <th>COORD_X</th>
+                    <th>COORD_Y</th>
+                </tr>
+            `;
+            taxis.forEach(taxi => {
+                const destino = taxi.pasajero === 1 ? (taxi.destino_a_final || '-') : (taxi.destino_a_cliente || '-');
+                const estado = obtenerEstadoTaxi(taxi.estado);
+                tablaTaxis.innerHTML += `
+                    <tr>
+                        <td>${taxi.id}</td>
+                        <td>${destino}</td>
+                        <td>${estado}</td>
+                        <td>${taxi.x}</td>
+                        <td>${taxi.y}</td>
+                    </tr>
+                `;
+            });
+
+            tablaClientes.innerHTML = `
+                <tr>
+                    <th>ID</th>
+                    <th>DESTINO</th>
+                    <th>ESTADO</th>
+                </tr>
+            `;
+            clientes.forEach(cliente => {
+                tablaClientes.innerHTML += `
+                    <tr>
+                        <td>${cliente.id}</td>
+                        <td>${cliente.destino || 'N/A'}</td>
+                        <td>${cliente.estado}</td>
+                    </tr>
+                `;
+            });
         }
 
         // Iniciar actualización
+        function iniciarActualizacion() {
+            crearCuadricula();
+            cargarDatosMapa();
+            setInterval(cargarDatosMapa, 500);
+        }
+
         iniciarActualizacion();
     </script>
 </body>

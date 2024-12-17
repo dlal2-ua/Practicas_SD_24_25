@@ -243,7 +243,10 @@ def hilo_lector_cliente(broker, cola_mensajes):
             
                 if (buscarCliente(conexion, cliente_id) == False):
                     # Abre la conexión a la base de datos para agregar el cliente
-                    agregarCliente(conexion, cliente_id, destino, "EN ESPERA", 0, 0)
+                    (posX, posY)= obtener_pos_inicial_cliente(cliente_id)
+                    agregarCliente(conexion, cliente_id, destino, "EN ESPERA", posX, posY)
+                else:
+                    actualizar_destino_cliente(conexion, cliente_id, destino, "EN ESPERA")
 
             except IndexError:
                 print(f"Error procesando el mensaje: {mensaje}")
@@ -487,7 +490,7 @@ def actualizar_tablero(ax, destinos, clientes):
         if estado == 0:
             color_taxi = "green"  # Estado 0: taxi en verde (en servicio)
         elif estado in [1, 2]:
-            color_taxi = "red"    # Estado 1 o 2: taxi en rojo (parado por sensor)
+            color_taxi = "red"    # Estado 1 o 2: taxi en rojo (1: parado pero autorizado, 2: parado por sensor)
         elif estado == 3:
             color_taxi = "red"    # Estado 3: taxi en rojo y añadir exclamación en el nombre (parado por central)
         elif estado == 4:
@@ -574,30 +577,43 @@ def manejar_ciudad_ko():
 
         if taxis:  # Comprobamos si hay taxis en la base de datos
             for taxi in taxis:
-                taxi_id, coord_x, coord_y, destino, estado = taxi
+                taxi_id, coord_x, coord_y, destino_a_cliente, estado, pasajero, destino_a_final = taxi
                 
                 print(f"Procesando taxi {taxi_id}...")
 
                 if estado in (0, 1, 2, 3):  # Estados que requieren cambiar el estado del taxi
-                    cambiar_estado_TAXI_ciudad_ko(taxi_id)
+                    #cambiar_estado_TAXI_ciudad_ko(taxi_id)
+                    volver_base(broker, taxi_id, coord_x, coord_y, destino_a_cliente)
                     actualizar_tabla_taxis(taxi_id)
-                    volver_base(broker, taxi_id, coord_x, coord_y, destino)
-                elif estado == 4:
-                    print(f"Taxi {taxi_id} ya está en estado 4, volviendo a la base.")
-                    volver_base(broker, taxi_id, coord_x, coord_y, destino)
 
                 
         else:
             print("No hay taxis disponibles en la base de datos para procesar.")
     except Exception as e:
-        print(f"Error al procesar los taxis: {e}")
+        print(f"1ºError al procesar los taxis: {e}")
 
 
 
 
 def manejar_ciudad_ok():
+    broker = devuelve_broker()
     print("comeme el nabo...")
-    cambiar_estado_TAXI_ciudad_ok()
+    #cambiar_estado_TAXI_ciudad_ok()
+    print("hola")
+    try:
+        taxis = obtener_datos_TAXI_ciudad()
+        if taxis:  # Comprobamos si hay taxis en la base de datos
+            for taxi in taxis:
+                print("adios")
+                taxi_id, coord_x, coord_y, destino_a_cliente, estado, pasajero, destino_a_final = taxi
+                print("peto")
+                if estado == 0:
+                    reanudar_no_congelado(broker, taxi_id, coord_x, coord_y, pasajero, destino_a_cliente, destino_a_final)
+    except Exception as e:
+        print(f"2ºError al procesar los taxis: {e}")
+
+                
+
 
 
 
@@ -756,8 +772,7 @@ def menu(broker):
                 print("Elige el taxi que quieres que vuelva a base:")
                 t4 = input()
                 if buscar_taxi_activo(int(t4)):
-                    print("hola")
-                    #volver_base(broker, t4, coordX_taxi(t4), coordY_taxi(t4), obtener_cliente(t4))
+                    volver_base(broker, t4, coordX_taxi(t4), coordY_taxi(t4), obtener_cliente(t4))
                 else:
                     print(f"El taxi {t4} no está disponible")
 

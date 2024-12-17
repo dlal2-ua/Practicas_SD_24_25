@@ -430,7 +430,7 @@ def cambiar_estado_TAXI_ciudad_ok():
 def obtener_datos_TAXI_ciudad():
     conexion = conectar_bd()
     cursor = conexion.cursor()
-    cursor.execute("SELECT id, coordX, coordY, destino_a_cliente, estado FROM taxis")
+    cursor.execute("SELECT id, coordX, coordY, destino_a_cliente, estado, pasajero, destino_a_final FROM taxis")
     taxi = cursor.fetchall()
     cursor.close()
     conexion.close()
@@ -444,3 +444,17 @@ def cambiarEstadoClientes(estado):
         conexion.commit()
     except mysql.connector.Error as e:
         print(f"Error al actualizar estado del cliente en la base de datos: {e}")
+
+
+def actualizar_destino_cliente(conexion, cliente_id, destino, estado):
+    cursor = conexion.cursor()
+    cursor.execute("UPDATE clientes SET destino = %s, estado = %s WHERE id = %s", (destino, estado, cliente_id))
+    conexion.commit()  # Asegurar que los cambios se guarden en la base de datos
+    cursor.close()  # Cerrar el cursor después de realizar la operación
+
+def obtener_coord_cliente(cliente_id):
+    conexion = conectar_bd()
+    cursor = conexion.cursor()
+    cursor.execute("SELECT coordX, coordY FROM clientes WHERE id = %s", (cliente_id,))
+    resultado = cursor.fetchone()
+    return resultado
