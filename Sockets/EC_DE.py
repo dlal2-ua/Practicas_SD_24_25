@@ -175,6 +175,7 @@ def handle_server():
                     client.connect(ADDR_CLIENT)
                     message = idTaxi.encode(FORMAT)
                     client.sendall(message)
+                    respuesta = client.recv(2048).decode(FORMAT)
                 elif r =="1":
                     url = 'https://localhost:3000/taxis'
                     data = {'id': idTaxi}
@@ -194,7 +195,6 @@ def handle_server():
                         print("La central no está conectada. Esperando a que se conecte...")
                     contador += 1
                     time.sleep(1)
-        respuesta = client.recv(2048).decode(FORMAT)
         print(respuesta)
         if(respuesta == "Taxi correctamente autentificado"):
             autentificado = True
