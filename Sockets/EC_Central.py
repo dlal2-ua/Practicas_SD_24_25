@@ -15,7 +15,9 @@ from queue import Queue
 import os
 from colorama import Fore, init
 ##======
-import CENTRA_prueba_dani
+import CTC_auxiliar
+import io
+import requests
 
 """
 En Python, no se puede manejr señales (como SIGINT o SIGTERM) en hilos secundarios.
@@ -218,12 +220,15 @@ def hilo_lector_cliente(broker, cola_mensajes):
 
             # Verificar si el cliente está pidiendo si la central está activa
             if mensaje == "Central activa?":
+                insertar_auditoria("INFO", mensaje)
                 cliente_id = message.key.decode('utf-8')  # ID del cliente desde el 'key'
                 respuesta = "Central está operativa"
+                insertar_auditoria("INFO", respuesta)
                 producer.send('CENTRAL-CLIENTE', key=cliente_id.encode('utf-8'), value=respuesta.encode('utf-8'))
                 producer.flush()
                 print(f"Respondido al cliente {cliente_id}: {respuesta}")
                 redirector.log(f"Respondido al cliente {cliente_id}: {respuesta}")
+                insertar_auditoria("INFO", f"Respondido al cliente {cliente_id}: {respuesta}")
             
                 continue  # Saltar al siguiente mensaje, no procesar destinos aún
 
@@ -248,8 +253,10 @@ def hilo_lector_cliente(broker, cola_mensajes):
                     # Abre la conexión a la base de datos para agregar el cliente
                     (posX, posY)= obtener_pos_inicial_cliente(cliente_id)
                     agregarCliente(conexion, cliente_id, destino, "EN ESPERA", posX, posY)
+                    insertar_auditoria("INFO", f"Cliente {cliente_id} añadido con destino {destino}")
                 else:
                     actualizar_destino_cliente(conexion, cliente_id, destino, "EN ESPERA")
+                    insertar_auditoria("INFO", f"Cliente {cliente_id} actualizado con destino {destino}")
 
             except IndexError:
                 print(f"Error procesando el mensaje: {mensaje}")
@@ -360,6 +367,7 @@ def hilo_lector_taxis(broker):
             except IndexError:
                 print(f"Error procesando el mensaje del taxi: {mensaje}")
                 redirector.log(f"Error procesando el mensaje del taxi: {mensaje}")
+                insertar_auditoria("ERROR", f"Error procesando el mensaje del taxi: {mensaje}")
                 continue
 
 
@@ -385,6 +393,7 @@ def procesar_coordenadas_taxi(taxi_id, coordX_taxi_, coordY_taxi_, broker):
                 #print(f"Taxi {taxi_id} ha recogido al cliente {cliente_id}.")
 
                 cambiarEstadoCliente(conexion, cliente_id, f"EN TAXI {taxi_id}")
+                insertar_auditoria("INFO", f"Cliente {cliente_id} recogido por taxi {taxi_id}")
                 subir_pasajero(conexion, taxi_id)
                 actualizar_tabla_taxis(taxi_id)
                 agregarCoordCliente(conexion, cliente_id, coordX_taxi_, coordY_taxi_)
@@ -428,6 +437,7 @@ def procesar_coordenadas_taxi(taxi_id, coordX_taxi_, coordY_taxi_, broker):
                 if abs(coordX_taxi_ - coordX_destino) < 0.1 and abs(coordY_taxi_ - coordY_destino) < 0.1 and taxi_asignado == taxi_id:
                     #print(f"Taxi {taxi_id} ha llegado al destino del cliente {cliente_id}.")
                     cambiarEstadoCliente(conexion, cliente_id, "HA LLEGADO")
+                    insertar_auditoria("INFO", f"Taxi {taxi_id} ha llegado al destino del cliente {cliente_id}")
                     cambiarPosInicialCliente(conexion, cliente_id, coordX_destino, coordY_destino)
 
                     with lock_clientes:
@@ -532,7 +542,7 @@ def actualizar_tablero(ax, destinos, clientes):
 def temperatura():
     try:
         # Obtener la temperatura
-        temp = CENTRA_prueba_dani.coger_temperatura()
+        temp = CTC_auxiliar.coger_temperatura()
         
         # Validar que sea un número
         if not isinstance(temp, (int, float)):
@@ -544,8 +554,8 @@ def temperatura():
         else:
             manejar_ciudad_ok()
     except ValueError as ve:
-        print(f"Error: {ve}. La ciudad podría estar mal escrita.")
-        redirector.log(f"Error: {ve}. La ciudad podría estar mal escrita.")
+        print(Fore.YELLOW + f"Error: {ve}. La ciudad podría estar mal escrita.")
+        redirector.log(Fore.YELLOW + f"Error: {ve}. La ciudad podría estar mal escrita.")
         manejar_ciudad_invalida()
     except Exception as e:
         print(f"Error inesperado al obtener la temperatura: {e}")
@@ -553,8 +563,8 @@ def temperatura():
         manejar_ciudad_invalida()
 
 def manejar_ciudad_invalida():
-    print("La ciudad introducida no es válida. Por favor, verifica el nombre e inténtalo de nuevo.")
-    redirector.log("La ciudad introducida no es válida. Por favor, verifica el nombre e inténtalo de nuevo.")
+    print(Fore.YELLOW + "La ciudad introducida no es válida. Por favor, verifica el nombre e inténtalo de nuevo.")
+    redirector.log(Fore.YELLOW + "La ciudad introducida no es válida. Por favor, verifica el nombre e inténtalo de nuevo.")
     # Opcional: puedes agregar lógica para resetear el estado o pedir al usuario que introduzca otra ciudad.
 
 
@@ -577,9 +587,11 @@ def manejar_ciudad_ko():
     broker = devuelve_broker()
     print("Mandando todos los taxis a la base...")
     redirector.log("Mandando todos los taxis a la base...")
+    insertar_auditoria("INFO", "Mandando todos los taxis a la base...")
 
     #congelar_clientes()
     cambiarEstadoClientes("CONGELADO")
+    insertar_auditoria("INFO", "Todos los clientes han sido actualizados a estado CONGELADO.")
 
     try:
         # Leer los taxis desde la base de datos
@@ -594,8 +606,12 @@ def manejar_ciudad_ko():
                     actualizar_tabla_taxis(taxi_id)
                     if destino_a_final is not None:
                         volver_base(broker, taxi_id, coord_x, coord_y, destino_a_cliente)
+                        redirector.log(f"Taxi {taxi_id} ha sido enviado a la base.\n")
+                        insertar_auditoria("INFO", f"Taxi {taxi_id} ha sido enviado a la base.")
                     else:
                         volver_base2(broker, taxi_id, coord_x, coord_y)
+                        redirector.log(f"Taxi {taxi_id} ha sido enviado a la base.\n")
+                        insertar_auditoria("INFO", f"Taxi {taxi_id} ha sido enviado a la base.")
 
                 
         else:
@@ -619,8 +635,12 @@ def manejar_ciudad_ok():
                 #cambiar_estado_TAXI_ciudad_ok(taxi_id)
                 if estado == 0 and destino_a_cliente is not None:
                     reanudar_no_congelado(broker, taxi_id, coord_x, coord_y, pasajero, destino_a_cliente, destino_a_final)
+                    redirector.log(f"Taxi {taxi_id} ha sido reanudado después de congelación.\n")
+                    insertar_auditoria("INFO", f"Taxi {taxi_id} ha sido reanudado despues de congelación.")
                 elif estado == 0 and destino_a_cliente is None:
-                    poner_taxi_disponible(taxi_id)          
+                    poner_taxi_disponible(taxi_id)
+                    redirector.log(f"Taxi {taxi_id} ha sido puesto disponible después de congelación.\n")
+                    insertar_auditoria("INFO", f"Taxi {taxi_id} ha sido puesto disponible después de congelación.")
 
     except Exception as e:
         print(f"2ºError al procesar los taxis: {e}")
@@ -632,13 +652,6 @@ def manejar_ciudad_ok():
 
 ##=======================================================================================================================================================================
 
-
-
-import sys
-import io
-import threading
-import time
-import requests
 
 class RedirectStdoutToAPI:
     def __init__(self, api_url):
@@ -687,9 +700,6 @@ redirector.start()
 
 
 ##=======================================================================================================================================================================
-
-
-
 
 
 
@@ -841,11 +851,11 @@ def menu(broker):
                     print(f"El taxi {t4} no está disponible")
 
             elif respuesta == "e":
-                # Llamar al menú de CENTRA_prueba_dani
-                print(Fore.LIGHTCYAN_EX + "--- Menú de CENTRA_prueba ---")
-                CENTRA_prueba_dani.menu()
+                # Llamar al menú de CTC_auxiliar
+                print(Fore.LIGHTCYAN_EX + "--- Menú de EC_CTC ---")
+                CTC_auxiliar.menu()
                 t5 = input("Selecciona una opción: ")  # Opción elegida por el usuario
-                CENTRA_prueba_dani.controlador_menu(t5)  # Llamar a la función
+                CTC_auxiliar.controlador_menu(t5)  # Llamar a la función
                 
 
     except OSError:

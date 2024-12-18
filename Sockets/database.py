@@ -15,7 +15,7 @@ conexion = mysql.connector.connect(
 cursor = conexion.cursor()
 
 cursor.execute('''
-    DROP TABLE IF EXISTS taxis, clientes, pos_inicial_cliente, destinos,encriptado
+    DROP TABLE IF EXISTS taxis, clientes, pos_inicial_cliente, destinos, encriptado, auditoria
     ''')
 
 # Crear las tablas
@@ -62,9 +62,23 @@ CREATE TABLE IF NOT EXISTS destinos (
     coordY INT NOT NULL
 )
 ''')
-       
 
+# Los estados tienen que ser INFO, ERROR, WARNING
+cursor.execute('''
+CREATE TABLE IF NOT EXISTS auditoria (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP,                     
+    estado VARCHAR(255) NOT NULL,
+    mensaje VARCHAR(255) NOT NULL
+)
+''')
 
+# Estado 0 = Ciudad no congelada, Estado 1 = Ciudad congelada
+cursor.execute('''
+CREATE TABLE IF NOT EXISTS estado_ciudad (
+    estado INT PRIMARY KEY DEFAULT 0
+)
+''')
 
 #================================================================================================
 # INSERTS

@@ -8,13 +8,17 @@ Proveer estos datos al frontend mediante una API REST.
 
 """
 
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, render_template
 from flask_cors import CORS
 import mysql.connector
 from funciones_generales import conectar_bd
 
 app = Flask(__name__)
 CORS(app)  # Permitir conexiones desde otras aplicaciones
+
+@app.route('/')
+def index():
+    return render_template('API_Central_html.html')
 
 # Ruta para obtener información de taxis
 @app.route('/api/taxis', methods=['GET'])
@@ -52,5 +56,19 @@ def obtener_destinos():
     destinos_dict = [{"nombre": destino[0], "x": destino[1], "y": destino[2]} for destino in destinos]
     return jsonify(destinos_dict)
 
+
+# Ruta para obtener información de auditoría
+@app.route('/api/auditoria', methods=['GET'])
+def obtener_auditoria():
+    conexion = conectar_bd()
+    cursor = conexion.cursor()
+    cursor.execute("SELECT id, fecha, estado, mensaje FROM auditoria")
+    auditoria = cursor.fetchall()
+    cursor.close()
+    conexion.close()
+    auditoria_dict = [{"id": registro[0], "fecha": registro[1].strftime('%Y-%m-%d %H:%M:%S'), "estado": registro[2], "mensaje": registro[3]} for registro in auditoria]
+    return jsonify(auditoria_dict)
+
+
 if __name__ == '__main__':
-    app.run(host="0.0.0.0", port=5000)
+    app.run(host="0.0.0.0", port=4000)

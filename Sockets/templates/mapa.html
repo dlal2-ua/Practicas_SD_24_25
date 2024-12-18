@@ -185,11 +185,10 @@
     </div>
     <!-- Contenedor de Logs -->
     <div class="contenedor-logs">
-    <h3>Logs:</h3>
-    <button id="clear-logs" style="margin-bottom: 10px;">Limpiar Logs</button>
-    <div class="logs" id="logs">
-        <p>No hay logs disponibles...</p>
-    </div>
+        <h3>Logs:</h3>
+        <div class="logs" id="logs">
+            <p>No hay logs disponibles...</p>
+        </div>
     </div>
 
     <script>
@@ -391,8 +390,6 @@
         // Actualizar los logs cada segundo
         setInterval(cargarLogs, 200);
 
-        // Evento para el botón de limpiar logs
-        document.getElementById('clear-logs').addEventListener('click', limpiarLogs);
             
     </script>
 </body>

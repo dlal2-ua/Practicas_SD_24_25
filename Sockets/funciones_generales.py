@@ -466,3 +466,11 @@ def poner_taxi_disponible(taxi_id):
     conexion.commit()
     cursor.close()
     conexion.close()
+
+def insertar_auditoria(estado, mensaje):
+    conexion = conectar_bd()
+    cursor = conexion.cursor()
+    cursor.execute("INSERT INTO auditoria (estado, mensaje) VALUES (%s, %s)", (estado, mensaje))
+    conexion.commit()
+    cursor.close()
+    conexion.close()
