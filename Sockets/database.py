@@ -76,12 +76,16 @@ CREATE TABLE IF NOT EXISTS auditoria (
 # Estado 0 = Ciudad no congelada, Estado 1 = Ciudad congelada
 cursor.execute('''
 CREATE TABLE IF NOT EXISTS estado_ciudad (
-    estado INT PRIMARY KEY DEFAULT 0
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    estado INT NOT NULL
 )
 ''')
 
 #================================================================================================
 # INSERTS
+cursor.execute('''
+    UPDATE estado_ciudad SET estado = 0
+''')
 
 cursor.execute('''
     INSERT INTO pos_inicial_cliente (id, coordX, coordY) VALUES 

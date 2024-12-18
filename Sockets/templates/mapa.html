@@ -100,6 +100,12 @@
             background-color: #fff;
             opacity: 0.85;
         }
+
+        /* Estilo para los taxis azules */
+.taxi-azul {
+    background-color: blue;
+    color: white;
+}
     
         /* Colores para los elementos */
         .taxi { background-color: red; color: white; }
@@ -145,6 +151,22 @@
     <!-- Contenedor de tablas -->
     <div class="contenedor-tablas-mapa">
         <div class="contenedor-tablas">
+            <div class="tabla-box">
+                <h3>Menú de EC_CTC:</h3>
+                <form id="menu-form">
+                    <label for="menu-opcion">Selecciona una opción:</label>
+                    <select id="menu-opcion" name="menu-opcion">
+                        <option value="1">Consultar estado del tráfico</option>
+                        <!-- <option value="2">2. Cambiar ciudad</option> -->
+                    </select>
+                    <div id="ciudad-input-container" style="display: none; margin-top: 10px;">
+                        <label for="ciudad">Escribe la ciudad:</label>
+                        <input type="text" id="ciudad" name="ciudad" placeholder="Nombre de la ciudad">
+                    </div>
+                    <button type="submit" style="margin-top: 10px;">Ejecutar</button>
+                </form>
+            </div>
+            
             <!-- Tabla de Taxis -->
             <div class="tabla-box">
                 <h3>Tabla de Taxis:</h3>
@@ -185,13 +207,17 @@
     </div>
     <!-- Contenedor de Logs -->
     <div class="contenedor-logs">
-        <h3>Logs:</h3>
+        <h3>Mensajes central:</h3>
         <div class="logs" id="logs">
             <p>No hay logs disponibles...</p>
         </div>
     </div>
 
     <script>
+
+        //=======
+        const ip_maquina = "127.0.0.1"; 
+        //=======
         const mapa = document.getElementById('mapa');
         const tablaTaxis = document.getElementById('tabla-taxis');
         const tablaClientes = document.getElementById('tabla-clientes');
@@ -211,7 +237,7 @@
         // Función para obtener datos del backend
         async function cargarDatosMapa() {
             try {
-                const response = await fetch('http://localhost:5000/api/mapa');
+                const response = await fetch(`http://${ip_maquina}:5000/api/mapa`);
                 const datos = await response.json();
                 dibujarDatos(datos);
                 actualizarTablas(datos);
@@ -235,74 +261,80 @@
 
         // Dibujar datos en el mapa
         // Dibujar datos en el mapa
-        function dibujarDatos(datos) {
-            const cells = document.querySelectorAll('.cell');
-            cells.forEach(cell => {
-                cell.className = 'cell'; // Reseteamos la clase de todas las celdas
-                cell.textContent = '';    // Limpiamos el contenido de las celdas
-            });
+function dibujarDatos(datos) {
+    const cells = document.querySelectorAll('.cell');
+    cells.forEach(cell => {
+        cell.className = 'cell'; // Reseteamos la clase de todas las celdas
+        cell.textContent = '';    // Limpiamos el contenido de las celdas
+    });
 
-            // Primero dibujamos los taxis
-            datos.forEach(item => {
+    // Primero dibujamos los taxis
+    datos.forEach(item => {
+        const index = (item.y - 1) * 20 + (item.x - 1);
+        const cell = cells[index];
+        if (cell) {
+            if (item.tipo === "taxi") {
+                // Si el taxi tiene estado "congelado", lo mostramos en azul
+                if (item.color === "azul") {
+                    cell.classList.add('taxi', 'taxi-azul'); // Añadimos clase 'taxi-azul'
+                } else {
+                    // Si no está congelado, lo mostramos con el color normal
+                    if (item.estado === 0) {
+                        cell.classList.add('taxi', 'taxi-verde');
+                    } else {
+                        cell.classList.add('taxi');
+                    }
+                }
+
+                // Comprobar si el cliente está en las mismas coordenadas que el taxi
+                const cliente = datos.find(cliente => cliente.tipo === 'cliente' && 
+                    cliente.x === item.x && 
+                    cliente.y === item.y &&
+                    cliente.id === item.destino_a_cliente); // Verificamos que el cliente es el correcto
+
+                if (cliente) {
+                    cell.textContent = `${item.id}-${cliente.id}`; // Mostrar "id del taxi-id del cliente"
+                    
+                    // Limpiar al cliente del mapa (eliminamos la celda correspondiente)
+                    const clienteCell = document.querySelector(`[data-index="${(cliente.y - 1) * 20 + (cliente.x - 1)}"]`);
+                    if (clienteCell) {
+                        clienteCell.textContent = ''; // Limpiamos la celda del cliente
+                    }
+                } else {
+                    cell.textContent = `${item.id}`; // Solo mostramos el id del taxi
+                }
+            }
+        }
+    });
+
+    // Luego, dibujamos los clientes, asegurándonos de que no estén en la misma posición que un taxi
+    datos.forEach(item => {
+        if (item.tipo === "cliente") {
+            const taxiEnPosicion = datos.find(taxi => taxi.tipo === 'taxi' && taxi.x === item.x && taxi.y === item.y);
+            if (!taxiEnPosicion) {
                 const index = (item.y - 1) * 20 + (item.x - 1);
                 const cell = cells[index];
                 if (cell) {
-                    if (item.tipo === "taxi") {
-                        // Si el taxi tiene estado 0, se pinta de verde
-                        if (item.estado === 0) {
-                            cell.classList.add('taxi', 'taxi-verde'); // Añadimos clase 'taxi-verde'
-                        } else {
-                            cell.classList.add('taxi');
-                        }
-
-                        // Comprobar si el cliente está en las mismas coordenadas que el taxi
-                        const cliente = datos.find(cliente => cliente.tipo === 'cliente' && 
-                            cliente.x === item.x && 
-                            cliente.y === item.y &&
-                            cliente.id === item.destino_a_cliente); // Verificamos que el cliente es el correcto
-
-                        if (cliente) {
-                            cell.textContent = `${item.id}-${cliente.id}`; // Mostrar "id del taxi-id del cliente"
-                            
-                            // Limpiar al cliente del mapa (eliminamos la celda correspondiente)
-                            const clienteCell = document.querySelector(`[data-index="${(cliente.y - 1) * 20 + (cliente.x - 1)}"]`);
-                            if (clienteCell) {
-                                clienteCell.textContent = ''; // Limpiamos la celda del cliente
-                            }
-                        } else {
-                            cell.textContent = `${item.id}`; // Solo mostramos el id del taxi
-                        }
-                    }
+                    cell.classList.add('cliente');
+                    cell.textContent = `${item.id}`;
                 }
-            });
-
-            // Luego, dibujamos los clientes, asegurándonos de que no estén en la misma posición que un taxi
-            datos.forEach(item => {
-                if (item.tipo === "cliente") {
-                    const taxiEnPosicion = datos.find(taxi => taxi.tipo === 'taxi' && taxi.x === item.x && taxi.y === item.y);
-                    if (!taxiEnPosicion) {
-                        const index = (item.y - 1) * 20 + (item.x - 1);
-                        const cell = cells[index];
-                        if (cell) {
-                            cell.classList.add('cliente');
-                            cell.textContent = `${item.id}`;
-                        }
-                    }
-                }
-            });
-
-            // Finalmente, dibujamos los destinos
-            datos.forEach(item => {
-                if (item.tipo === "destino") {
-                    const index = (item.y - 1) * 20 + (item.x - 1);
-                    const cell = cells[index];
-                    if (cell) {
-                        cell.classList.add('destino');
-                        cell.textContent = `${item.nombre}`;
-                    }
-                }
-            });
+            }
         }
+    });
+
+    // Finalmente, dibujamos los destinos
+    datos.forEach(item => {
+        if (item.tipo === "destino") {
+            const index = (item.y - 1) * 20 + (item.x - 1);
+            const cell = cells[index];
+            if (cell) {
+                cell.classList.add('destino');
+                cell.textContent = `${item.nombre}`;
+            }
+        }
+    });
+}
+
 
 
 
@@ -366,7 +398,7 @@
         async function cargarLogs() {
             try {
                 // Endpoint de la API para obtener logs
-                const response = await fetch('http://localhost:5000/api/obtener_logs');
+                const response = await fetch(`http://${ip_maquina}:5000/api/obtener_logs`);
                 if (response.ok) {
                     const data = await response.json();
                     const logsContainer = document.getElementById('logs');
@@ -389,6 +421,49 @@
 
         // Actualizar los logs cada segundo
         setInterval(cargarLogs, 200);
+
+
+        const menuForm = document.getElementById('menu-form');
+        const menuOpcion = document.getElementById('menu-opcion');
+        const ciudadInputContainer = document.getElementById('ciudad-input-container');
+        const ciudadInput = document.getElementById('ciudad');
+
+        // Mostrar/ocultar el campo de texto según la opción seleccionada
+        menuOpcion.addEventListener('change', () => {
+            if (menuOpcion.value === '2') {
+                ciudadInputContainer.style.display = 'block';
+            } else {
+                ciudadInputContainer.style.display = 'none';
+            }
+        });
+
+        // Manejar el envío del formulario
+        menuForm.addEventListener('submit', async (event) => {
+            event.preventDefault(); // Evita la recarga de la página
+            const opcion = menuOpcion.value;
+            const ciudad = ciudadInput.value;
+
+            try {
+                const response = await fetch(`http://${ip_maquina}:5000/api/menu`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ opcion, ciudad }),
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    //alert(`Resultado: ${data.mensaje}`);
+                } else {
+                    //alert('Error al ejecutar la opción');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                //alert('Error de conexión con el servidor.');
+            }
+        });
+
 
             
     </script>

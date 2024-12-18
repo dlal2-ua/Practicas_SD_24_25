@@ -422,7 +422,7 @@ def cambiar_estado_TAXI_ciudad_ko(taxi_id):
 def cambiar_estado_TAXI_ciudad_ok(taxi_id):
     conexion = conectar_bd()
     cursor = conexion.cursor()
-    cursor.execute("UPDATE taxis SET estado = 0where id = %s", (taxi_id,))
+    cursor.execute("UPDATE taxis SET estado = 0 where id = %s", (taxi_id,))
     conexion.commit()  # Asegurar que los cambios se guarden en la base de datos
     cursor.close()  # Cerrar el cursor después de realizar la operación
 
@@ -474,3 +474,28 @@ def insertar_auditoria(estado, mensaje):
     conexion.commit()
     cursor.close()
     conexion.close()
+
+def ciudad_congelada():
+    conexion = conectar_bd()
+    cursor = conexion.cursor()
+    cursor.execute("UPDATE estado_ciudad SET estado = 1")
+    conexion.commit()
+    cursor.close()
+    conexion.close()
+
+def ciudad_no_congelada():
+    conexion = conectar_bd()
+    cursor = conexion.cursor()
+    cursor.execute("UPDATE estado_ciudad SET estado = 0")
+    conexion.commit()
+    cursor.close()
+    conexion.close()
+
+def obtener_estado_ciudad():
+    conexion = conectar_bd()
+    cursor = conexion.cursor()
+    cursor.execute("SELECT estado FROM estado_ciudad")
+    resultado = cursor.fetchone()
+    cursor.close()
+    conexion.close()
+    return resultado
