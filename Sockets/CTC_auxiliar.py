@@ -1,10 +1,19 @@
 import requests
 import time
-from EC_Central import temperatura
+from EC_Central import temperatura, RedirectStdoutToAPI
+from funciones_generales import insertar_auditoria
 
 
 ## INSTALAR ->>>>>>>> pip install sqlalchemy pymysql
 
+#=======================================================================================================
+# URL de la API
+API_URL = "http://localhost:5000/api/logs"
+
+# Instanciar y usar la clase
+redirector = RedirectStdoutToAPI(API_URL)
+redirector.start()
+#=======================================================================================================
 
 # URL de EC_CTC
 EC_CTC_URL = "http://127.0.0.1:5001/check_traffic"
@@ -16,14 +25,19 @@ def cambiar_ciudad():
         response = requests.post("http://127.0.0.1:5001/set_city", json={"city": nueva_ciudad})
         if response.status_code == 200:
             print(f"Ciudad cambiada a {nueva_ciudad}.")
+            redirector.log(f"Ciudad cambiada a {nueva_ciudad}.")
+            insertar_auditoria("INFO", f"Ciudad cambiada a {nueva_ciudad}.")
         else:
             print("Error al cambiar la ciudad:", response.json())
+            redirector.log(f"Error al cambiar la ciudad: {response.json()}")
+            insertar_auditoria("ERROR", f"Error al cambiar la ciudad: {response.json()}")
     except requests.exceptions.RequestException as e:
         print("No se pudo cambiar la ciudad:", e)
+        redirector.log("No se pudo cambiar la ciudad:", e)
+        insertar_auditoria("ERROR", f"No se pudo cambiar la ciudad: {e}")
 
 # Menú de opciones
 def menu():
-    print("\n--- Menú EC_CTC ---")
     print("1. Consultar estado del tráfico")
     print("2. Cambiar ciudad")
     print("3. Salir")
@@ -37,21 +51,29 @@ def controlador_menu(opcion):
             if response.status_code == 200:
                 data = response.json()
                 print(f"Estado del tráfico en {data['city']}: {data['status']} (Temperatura: {data['temperature']}°C)")
+                redirector.log(f"Estado del tráfico en {data['city']}: {data['status']} (Temperatura: {data['temperature']}°C)")
+                insertar_auditoria("INFO", f"Estado del tráfico en {data['city']}: {data['status']} (Temperatura: {data['temperature']}°C)")
             else:
                 print("Error al consultar EC_CTC:", response.json())
+                redirector.log(f"Error al consultar EC_CTC: {response.json()}")
+                insertar_auditoria("ERROR", f"Error al consultar EC_CTC: {response.json()}")
         except requests.exceptions.RequestException as e:
             print("No se ha podido conectar con EC_CTC, reintentando...")
+            redirector.log("No se ha podido conectar con EC_CTC, reintentando...")
+            insertar_auditoria("ERROR", f"No se ha podido conectar con EC_CTC, reintentando...")
 
     elif opcion == "2":
         cambiar_ciudad()
         temperatura()
 
     elif opcion == "3":
-        print("Saliendo del programa.")
+        print("Saliendo del menu.")
         exit
 
     else:
         print("Opción no válida. Por favor, elige una opción entre 1 y 3.")
+        redirector.log("Opción no válida. Por favor, elige una opción entre 1 y 3.")
+        insertar_auditoria("WARNING", "Opción no válida. Por favor, elige una opción entre 1 y 3.")
 
 
 
