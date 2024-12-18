@@ -2,6 +2,8 @@ from flask import Flask, jsonify, request, render_template
 from flask_cors import CORS
 import mysql.connector
 from funciones_generales import conectar_bd
+from CTC_auxiliar import *
+from EC_Central import temperatura
 
 app = Flask(__name__)
 CORS(app)  # Habilitar CORS para el frontend
@@ -14,7 +16,7 @@ def recibir_logs():
     log = request.json.get("log", "")
     if log:
         logs.append(log)
-        print(f"Log recibido: {log}")
+        #print(f"Log recibido: {log}")
     return jsonify({"status": "success"}), 200
 
 @app.route('/api/obtener_logs', methods=['GET'])
@@ -52,12 +54,50 @@ def obtener_datos_mapa():
     destinos = cursor.fetchall()
     destinos_dict = [{"tipo": "destino", "nombre": destino[0], "x": destino[1], "y": destino[2]} for destino in destinos]
 
+    # Obtener estado de la ciudad
+    cursor.execute("SELECT estado FROM estado_ciudad")  # Supongamos que la tabla se llama 'ciudad'
+    estado_ciudad = cursor.fetchone()  # Se asume que solo hay una fila para la ciudad
+    estado_ciudad_dict = [{"tipo": "ciudad", "estado": estado_ciudad}]
+
     # Combinar todos los datos
-    mapa_data = taxis_dict + clientes_dict + destinos_dict
+    mapa_data = taxis_dict + clientes_dict + destinos_dict + estado_ciudad_dict
 
     cursor.close()
     conexion.close()
     return jsonify(mapa_data)
+
+
+
+@app.route('/api/menu', methods=['POST'])
+def ejecutar_menu():
+    data = request.get_json()
+    opcion = data.get('opcion')
+    ciudad = data.get('ciudad')  # Campo opcional para la ciudad
+
+    if not opcion:
+        return jsonify({"error": "No se proporcionó una opción válida"}), 400
+
+    if opcion == "1":
+        # Lógica para consultar el estado del tráfico
+        print("1. Consultar estado del tráfico")
+        consultar_temperatura()
+        estado_trafico = "Tráfico fluido en todas las vías principales."
+        return jsonify({"mensaje": estado_trafico})
+
+    elif opcion == "2":
+        if not ciudad:
+            return jsonify({"error": "Debes proporcionar el nombre de la ciudad."}), 400
+        print(f"2. Cambiar ciudad a {ciudad}")
+        cambiar_ciudad_front(ciudad)
+        temperatura()
+        # Lógica para manejar el cambio de ciudad
+        resultado = f"La ciudad ha sido cambiada a {ciudad}."
+        return jsonify({"mensaje": resultado})
+
+    else:
+        return jsonify({"error": "Opción no válida."}), 400
+
+
 
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=5000)

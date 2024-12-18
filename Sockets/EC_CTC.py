@@ -5,8 +5,25 @@ import requests
 app = Flask(__name__)
 CORS(app)
 
+#=======================================================================================================================
+def leer_api_key(archivo):
+    """
+    Lee la API Key desde un archivo.
+    :param archivo: Ruta del archivo que contiene la API Key.
+    :return: La API Key como una cadena.
+    """
+    try:
+        with open(archivo, 'r') as f:
+            return f.read().strip()  # Leer y eliminar espacios en blanco
+    except FileNotFoundError:
+        raise Exception(f"No se encontró el archivo {archivo}. Por favor, asegúrate de que existe.")
+    except Exception as e:
+        raise Exception(f"Error al leer el archivo {archivo}: {e}")
+
+#=======================================================================================================================
 # Configuración inicial
-OPENWEATHER_API_KEY = "7448f35136de362e3dbdf21f10c8105b"  # Reemplaza con tu API Key de OpenWeather
+#API = 7448f35136de362e3dbdf21f10c8105b
+OPENWEATHER_API_KEY = leer_api_key("api_clima")  # Reemplaza con tu API Key de OpenWeather
 DEFAULT_CITY = "Madrid"  # Ciudad por defecto
 selected_city = DEFAULT_CITY
 
@@ -53,6 +70,8 @@ def check_traffic():
 @app.route('/get_city', methods=['GET'])
 def get_city():
     return jsonify({"city": selected_city}), 200
+
+
 
 
 if __name__ == '__main__':

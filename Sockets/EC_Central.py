@@ -216,7 +216,7 @@ def hilo_lector_cliente(broker, cola_mensajes):
             # Decodificar el mensaje recibido
             mensaje = message.value.decode('utf-8')
             print(f"Mensaje recibido: {mensaje}")
-            redirector.log(f"Mensaje recibido: {mensaje}")
+            redirector.log(f"Mensaje recibido: {mensaje} \n")
 
             # Verificar si el cliente está pidiendo si la central está activa
             if mensaje == "Central activa?":
@@ -227,7 +227,7 @@ def hilo_lector_cliente(broker, cola_mensajes):
                 producer.send('CENTRAL-CLIENTE', key=cliente_id.encode('utf-8'), value=respuesta.encode('utf-8'))
                 producer.flush()
                 print(f"Respondido al cliente {cliente_id}: {respuesta}")
-                redirector.log(f"Respondido al cliente {cliente_id}: {respuesta}")
+                redirector.log(f"Respondido al cliente {cliente_id}: {respuesta}\n")
                 insertar_auditoria("INFO", f"Respondido al cliente {cliente_id}: {respuesta}")
             
                 continue  # Saltar al siguiente mensaje, no procesar destinos aún
@@ -260,7 +260,7 @@ def hilo_lector_cliente(broker, cola_mensajes):
 
             except IndexError:
                 print(f"Error procesando el mensaje: {mensaje}")
-                redirector.log(f"Error procesando el mensaje: {mensaje}")
+                redirector.log(f"Error procesando el mensaje: {mensaje}\n")
                 continue
 
             # Obtener coordenadas iniciales del cliente
@@ -305,10 +305,10 @@ def hilo_lector_cliente(broker, cola_mensajes):
 
                 else:
                     print(f"No se encontraron coordenadas para el cliente {cliente_id}, no se puede asignar taxi.")
-                    redirector.log(f"No se encontraron coordenadas para el cliente {cliente_id}, no se puede asignar taxi.")
+                    redirector.log(f"No se encontraron coordenadas para el cliente {cliente_id}, no se puede asignar taxi.\n")
             else:
                 print(f"No hay taxis disponibles para el cliente {cliente_id}")
-                redirector.log(f"No hay taxis disponibles para el cliente {cliente_id}")
+                redirector.log(f"No hay taxis disponibles para el cliente {cliente_id}\n")
             # ==============
 
             # Simula un pequeño retraso entre mensajes
@@ -366,7 +366,7 @@ def hilo_lector_taxis(broker):
 
             except IndexError:
                 print(f"Error procesando el mensaje del taxi: {mensaje}")
-                redirector.log(f"Error procesando el mensaje del taxi: {mensaje}")
+                redirector.log(f"Error procesando el mensaje del taxi: {mensaje}\n")
                 insertar_auditoria("ERROR", f"Error procesando el mensaje del taxi: {mensaje}")
                 continue
 
@@ -394,6 +394,7 @@ def procesar_coordenadas_taxi(taxi_id, coordX_taxi_, coordY_taxi_, broker):
 
                 cambiarEstadoCliente(conexion, cliente_id, f"EN TAXI {taxi_id}")
                 insertar_auditoria("INFO", f"Cliente {cliente_id} recogido por taxi {taxi_id}")
+                redirector.log(f"Cliente {cliente_id} recogido por taxi {taxi_id}\n")
                 subir_pasajero(conexion, taxi_id)
                 actualizar_tabla_taxis(taxi_id)
                 agregarCoordCliente(conexion, cliente_id, coordX_taxi_, coordY_taxi_)
@@ -438,6 +439,7 @@ def procesar_coordenadas_taxi(taxi_id, coordX_taxi_, coordY_taxi_, broker):
                     #print(f"Taxi {taxi_id} ha llegado al destino del cliente {cliente_id}.")
                     cambiarEstadoCliente(conexion, cliente_id, "HA LLEGADO")
                     insertar_auditoria("INFO", f"Taxi {taxi_id} ha llegado al destino del cliente {cliente_id}")
+                    redirector.log(f"Taxi {taxi_id} ha llegado al destino del cliente {cliente_id}\n")
                     cambiarPosInicialCliente(conexion, cliente_id, coordX_destino, coordY_destino)
 
                     with lock_clientes:
@@ -495,6 +497,9 @@ def actualizar_tablero(ax, destinos, clientes):
     # Obtener los datos de cada taxi desde la base de datos
     conexion = conectar_bd()  # Establece la conexión a la base de datos
     taxis = obtener_taxis_desde_bd(conexion)  # Obtiene los datos de taxis
+
+    estado_ciudad = obtener_estado_ciudad()  # Saber si ciudad está congelada o no
+
     conexion.close()  # Cierra la conexión a la base de datos después de obtener los datos
 
     # Agregar taxis al tablero basados en la base de datos
@@ -511,14 +516,13 @@ def actualizar_tablero(ax, destinos, clientes):
         elif estado == 3:
             color_taxi = "red"    # Estado 3: taxi en rojo y añadir exclamación en el nombre (parado por central)
         elif estado == 4:
-            color_taxi = "blue"    # Estado 4: taxi en rojo y añadir asterisco en el nombre (hay hielo volver base)
+            color_taxi = "blue"    # Estado 4: taxi en azul y añadir asterisco en el nombre (hay hielo volver base)
 
         # Actualizar el texto del taxi, con exclamación si el estado es 3
         texto_taxi = f"{taxi_id}-{cliente_id}" if cliente_en_taxi != 0 else str(taxi_id)
         if estado == 3:
             texto_taxi += "!"  # Añadir exclamación al nombre del taxi en estado 3
-        elif estado == 4:
-            texto_taxi += "*"
+        
 
         # Representar el taxi en el tablero
         ax.add_patch(plt.Rectangle((coordX_taxi - 1, coordY_taxi - 1), 1, 1, color=color_taxi))
@@ -550,21 +554,23 @@ def temperatura():
 
         # Lógica según la temperatura
         if temp < 0:
+            ciudad_congelada()
             manejar_ciudad_ko()
         else:
+            ciudad_no_congelada()
             manejar_ciudad_ok()
     except ValueError as ve:
         print(Fore.YELLOW + f"Error: {ve}. La ciudad podría estar mal escrita.")
-        redirector.log(Fore.YELLOW + f"Error: {ve}. La ciudad podría estar mal escrita.")
+        redirector.log(Fore.YELLOW + f"Error: {ve}. La ciudad podría estar mal escrita.\n")
         manejar_ciudad_invalida()
     except Exception as e:
         print(f"Error inesperado al obtener la temperatura: {e}")
-        redirector.log(f"Error inesperado al obtener la temperatura: {e}")
+        redirector.log(f"Error inesperado al obtener la temperatura: {e}\n")
         manejar_ciudad_invalida()
 
 def manejar_ciudad_invalida():
     print(Fore.YELLOW + "La ciudad introducida no es válida. Por favor, verifica el nombre e inténtalo de nuevo.")
-    redirector.log(Fore.YELLOW + "La ciudad introducida no es válida. Por favor, verifica el nombre e inténtalo de nuevo.")
+    redirector.log(Fore.YELLOW + "La ciudad introducida no es válida. Por favor, verifica el nombre e inténtalo de nuevo.\n")
     # Opcional: puedes agregar lógica para resetear el estado o pedir al usuario que introduzca otra ciudad.
 
 
@@ -583,10 +589,14 @@ def congelar_clientes():
 
 
 
+
+
+
+
 def manejar_ciudad_ko():
     broker = devuelve_broker()
     print("Mandando todos los taxis a la base...")
-    redirector.log("Mandando todos los taxis a la base...")
+    redirector.log("Mandando todos los taxis a la base...\n")
     insertar_auditoria("INFO", "Mandando todos los taxis a la base...")
 
     #congelar_clientes()
@@ -604,6 +614,7 @@ def manejar_ciudad_ko():
                 if estado in (0, 1, 2, 3):  # Estados que requieren cambiar el estado del taxi
                     cambiar_estado_TAXI_ciudad_ko(taxi_id)
                     actualizar_tabla_taxis(taxi_id)
+
                     if destino_a_final is not None:
                         volver_base(broker, taxi_id, coord_x, coord_y, destino_a_cliente)
                         redirector.log(f"Taxi {taxi_id} ha sido enviado a la base.\n")
@@ -616,10 +627,12 @@ def manejar_ciudad_ko():
                 
         else:
             print("No hay taxis disponibles en la base de datos para procesar.")
-            redirector.log("No hay taxis disponibles en la base de datos para procesar.")
+            redirector.log("No hay taxis disponibles en la base de datos para procesar.\n")
     except Exception as e:
         print(f"1ºError al procesar los taxis: {e}")
-        redirector.log(f"1ºError al procesar los taxis: {e}")
+        redirector.log(f"1ºError al procesar los taxis: {e}\n")
+
+
 
 
 
@@ -644,10 +657,23 @@ def manejar_ciudad_ok():
 
     except Exception as e:
         print(f"2ºError al procesar los taxis: {e}")
-        redirector.log(f"2ºError al procesar los taxis: {e}")
+        redirector.log(f"2ºError al procesar los taxis: {e}\n")
 
                 
 
+# Crear e iniciar un hilo para ejecutar la función periódicamente
+def iniciar_temperatura_periodica():
+    hilo_temperatura = threading.Thread(target=comprobar_CTC_activo)
+    hilo_temperatura.daemon = True  # Permite que el hilo termine cuando el programa principal termine
+    hilo_temperatura.start()
+
+def comprobar_CTC_activo():
+    while True:
+        try:
+            CTC_auxiliar.consultar_temperatura()  # Llamada a la función para obtener la temperatura
+            time.sleep(30)  # Espera 10 segundos antes de volver a llamar a la función
+        except Exception as e:
+            print(f"EC_CTC no esta activo")
 
 
 ##=======================================================================================================================================================================
@@ -659,6 +685,8 @@ class RedirectStdoutToAPI:
         self.log_buffer = []  # Almacena solo los logs relevantes
         self.original_stdout = sys.stdout  # Para mantener el stdout original
         self.stop_thread = False
+        self.front_up_counter = 0  # Variable para controlar la impresión del mensaje "El modulo FRONT ha vuelto"
+
 
     def log(self, message):
         """Agregar mensajes relevantes al buffer (solo API, no terminal)"""
@@ -679,11 +707,20 @@ class RedirectStdoutToAPI:
         while not self.stop_thread:
             if self.log_buffer:
                 try:
-                    logs_to_send = "\n".join(self.log_buffer)
+                    logs_to_send = "\n".join(map(str, self.log_buffer))
                     requests.post(self.api_url, json={"log": logs_to_send})
                     self.log_buffer.clear()  # Limpia los logs enviados
+
+                    # Imprimir mensaje solo si el contador es 0 (es decir, cuando entra por primera vez)
+                    if self.front_up_counter == 0:
+                        self.original_stdout.write(Fore.GREEN + "El modulo FRONT ha vuelto\n")
+                        self.front_up_counter = 1  # Cambiar el contador para evitar que el mensaje se repita
+
                 except requests.RequestException as e:
-                    self.original_stdout.write(f"Error al enviar log a la API: {e}\n")
+                    #self.original_stdout.write(f"Error al enviar log a la API: {e}\n")
+                    self.original_stdout.write(Fore.RED + "El modulo FRONT se ha caido\n")
+                    self.front_up_counter = 0  # Reiniciar el contador cuando el sistema se caiga
+
             time.sleep(1)
 
 
@@ -707,6 +744,7 @@ redirector.start()
 def iniciar_central(broker):
     imprimir_tabla_taxis()
     imprimir_tabla_clientes()
+
 
     fig, ax = plt.subplots(figsize=(8, 8))
 
@@ -752,11 +790,9 @@ def iniciar_central(broker):
         print(f"Ocurrió un error en el bucle principal: {e}")
     finally:
         print("Cerrando central...")
-        redirector.log("Cerrando central...")
+        redirector.log("Cerrando central...\n")
         os._exit(0)  # Forzar la salida sin limpieza
         os.kill(0, signal.SIGKILL)  # Forzar la terminación de todos los procesos secundarios
-
-
 
 
 
@@ -773,12 +809,12 @@ def handle_client(addr,broker,connstream):
         autentificar_taxi(msg)
         asignarToken(msg)
         print(f"El taxi con id {msg} está autentificado")
-        redirector.log(f"El taxi con id {msg} está autentificado")
+        redirector.log(f"El taxi con id {msg} está autentificado\n")
         connstream.send("Taxi correctamente autentificado".encode(FORMAT))
 
     else:
         print(f"Se ha intentado conectar el taxi con id {msg} pero no ha sido posible")
-        redirector.log(f"Se ha intentado conectar el taxi con id {msg} pero no ha sido posible")
+        redirector.log(f"Se ha intentado conectar el taxi con id {msg} pero no ha sido posible\n")
         connstream.send("Este taxi no se puede autentificar en la bbdd".encode(FORMAT))
     connstream.close()
 
@@ -800,7 +836,7 @@ def start(broker):
         handle_client(addr,broker,connstream)
     server.close()
     print("Servidor cerrado correctamente.")
-    redirector.log("Servidor cerrado correctamente.")
+    redirector.log("Servidor cerrado correctamente.\n")
 
 def menu(broker):
     global msg
@@ -821,7 +857,7 @@ def menu(broker):
                     break  # Salir del bucle si la opción es válida
                 else:
                     print(Fore.RED + "Opción no válida. Por favor, selecciona una opción válida entre a, b, c, d o e.")
-                    redirector.log("Opción no válida. Por favor, selecciona una opción válida entre a, b, c, d o e.")
+                    redirector.log("Opción no válida. Por favor, selecciona una opción válida entre a, b, c, d o e.\n")
 
             if respuesta == "a":
                 print("Elige el taxi que quieres parar:")
@@ -901,6 +937,8 @@ def main():
             hilo_menu = threading.Thread(target=menu, args=(broker,))
             hilo_menu.start()
             hilo_servidor.start()
+
+            iniciar_temperatura_periodica()
 
             # Iniciar la central en el hilo principal (para evitar el problema de Matplotlib)
             iniciar_central(broker)
