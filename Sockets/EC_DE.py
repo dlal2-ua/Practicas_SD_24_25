@@ -1,4 +1,4 @@
-import socket 
+import socket,ssl
 import threading
 import time
 import sys
@@ -6,6 +6,9 @@ from kafka import KafkaConsumer, KafkaProducer
 from funciones_generales import *
 import os
 import requests
+from requests.packages.urllib3.exceptions import InsecureRequestWarning
+requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
+
 
 HEADER = 64
 SERVER = socket.gethostbyname(socket.gethostname())
@@ -164,40 +167,60 @@ def handle_server():
         while True:
             try:     
                 r = ""    
-                while r != "1" and r != "2" and r != "3":
+                while r != "3":
                     print("--------------------Menu-------------------")
                     print("1. Registrar el taxi")
                     print("2. Dar de baja el taxi")
                     print("3. Comenzar recorrido")
                     r = input()
-                if r == "3":
-                    client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                    client.connect(ADDR_CLIENT)
-                    message = idTaxi.encode(FORMAT)
-                    client.sendall(message)
-                    respuesta = client.recv(2048).decode(FORMAT)
-                elif r =="1":
-                    url = 'https://localhost:3000/taxis'
-                    data = {'id': idTaxi}
 
-                    try:
-                        response = requests.post(url, json=data)
-                        response.raise_for_status()  # Lanza una excepción si ocurre un error HTTP
-                        print('Código de respuesta:', response.status_code)
-                        print('Respuesta del servidor:', response.json())
-                    except requests.exceptions.RequestException as error:
-                        print('Error:', error)
-                elif r== "2":
-                    print("Dar de baja")
+                    if r == "3":
+                        context = ssl._create_unverified_context()
+                        with socket.create_connection(ADDR_CLIENT) as sock:
+                            with context.wrap_socket(sock, server_hostname=SERVER_CLIENT) as ssock:
+                                """client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                                client.connect(ADDR_CLIENT)
+                                message = idTaxi.encode(FORMAT)
+                                client.sendall(message)
+                                respuesta = client.recv(2048).decode(FORMAT)
+                                print(respuesta)"""
+                                ssock.send(idTaxi.encode(FORMAT))
+                                respuesta = ssock.recv(1024)
+                                print(respuesta)
+                        if(respuesta == b'Taxi correctamente autentificado'):
+                            autentificado = True
+                        else:
+                            os._exit(1)
+                    elif r =="1":
+                        time.sleep(1)
+                        url = 'https://localhost:3000/taxis'
+                        data = {'id': idTaxi}
+
+                        try:
+                            response = requests.post(url, json=data,verify=False)
+                            response.raise_for_status()  # Lanza una excepción si ocurre un error HTTP
+                            print('Código de respuesta:', response.status_code)
+                        except requests.exceptions.RequestException as error:
+                            print('Error:', error)
+                    elif r== "2":
+                        time.sleep(1)
+                        url = 'https://localhost:3000/taxis'
+                        delete_url = f"{url}/{idTaxi}"
+                        try:
+                            response = requests.delete(delete_url,verify=False)
+                            response.raise_for_status()  # Lanza una excepción si ocurre un error HTTP
+                            print('Código de respuesta:', response.status_code)
+                            if response.status_code == 200:
+                                sacar_token(idTaxi)
+
+                        except requests.exceptions.RequestException as error:
+                            print('Error:', error)
                 break
             except ConnectionRefusedError:
                     if contador == 0:
                         print("La central no está conectada. Esperando a que se conecte...")
                     contador += 1
                     time.sleep(1)
-        print(respuesta)
-        if(respuesta == "Taxi correctamente autentificado"):
-            autentificado = True
     except ConnectionAbortedError:
         print("Se ha perdido la conexion con la central")
 #Función para que el puerto aumente automáticamente cuando se ejecuta mas de 1 DE
