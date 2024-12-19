@@ -7,6 +7,10 @@ from funciones_generales import *
 import os
 import requests
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.primitives import padding
+from cryptography.hazmat.backends import default_backend
+import base64
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
 
@@ -16,10 +20,36 @@ PORT = 5050
 FORMAT = 'utf-8'
 parar_hilo_enviar_coord = False
 
+def get_clave():
+    taxi = sys.argv[5]
+    url = 'https://localhost:3000/clave'
+    get_url = f"{url}/{taxi}"
+    try:
+        response = requests.get(get_url,verify=False)
+        response.raise_for_status()
+        data = response.json()  # Analizar como JSON
+        if data and 'clave' in data[0]:  # Verificar si existe la clave en los resultados
+            clave = data[0]['clave']
+        else:
+            clave = "La clave no se encontró en la respuesta JSON."
+        return clave
+    except requests.exceptions.RequestException as error:
+        clave = f"Error en la solicitud: {error}"
+        print(clave)
+
+def cifrar(mensaje):
+    clave=get_clave()
+    clave_bytes = clave.encode()
+    padder = padding.PKCS7(128).padder()
+    padded_message = padder.update(mensaje.encode()) + padder.finalize()
+    cipher = Cipher(algorithms.AES(clave_bytes), modes.ECB(), backend=default_backend())
+    encryptor = cipher.encryptor()
+    cifrado = encryptor.update(padded_message) + encryptor.finalize()
+    return base64.b64encode(cifrado).decode()
 
 
 def enviar_central(id_taxi,broker,pasajero):
-    global parar_hilo_enviar_coord
+    global parar_hilo_enviar_coord 
     global msg_sensor
     global Central_para
     global X_taxi
@@ -41,7 +71,10 @@ def enviar_central(id_taxi,broker,pasajero):
         if X_taxi == destinoX and Y_taxi == destinoY:
             print(f"Taxi {id_taxi} ha llegado al destino y ha recogido al pasajero {pasajero}.")
             coordenada = str(id_taxi) + "," + str(X_taxi) + "," + str(Y_taxi) + "," + str(msg_sensor)+ ",nada"
-            producer.send('TAXIS', value=coordenada.encode('utf-8'))
+            coordenada_cifrada= cifrar(coordenada)
+            print(coordenada_cifrada)
+            coordenada_enviar=id_taxi +":"+coordenada_cifrada
+            producer.send('TAXIS', value=coordenada_enviar.encode('utf-8'))
             mensaje_cliente = f"ID:{pasajero} OK"
             producercliente.send('TAXI-CLIENTE',value=mensaje_cliente.encode('utf-8'))
             time.sleep(1)
@@ -57,7 +90,10 @@ def enviar_central(id_taxi,broker,pasajero):
                     else: 
                         X_taxi -= 1
                     coordenada = str(id_taxi) + "," + str(X_taxi) + "," + str(Y_taxi) + "," + str(msg_sensor)+ ",nada"
-                    producer.send('TAXIS', value=coordenada.encode('utf-8'))
+                    coordenada_cifrada= cifrar(coordenada)
+                    coordenada_enviar=id_taxi +":" + coordenada_cifrada 
+                    print(coordenada_enviar)
+                    producer.send('TAXIS', value=coordenada_enviar.encode('utf-8'))
                     time.sleep(1)
                     # Actualizar el mapa cada vez que se envían coordenadas
                     dibujar_mapa()
@@ -70,21 +106,30 @@ def enviar_central(id_taxi,broker,pasajero):
                             else: 
                                 Y_taxi -= 1
                             coordenada = str(id_taxi) + "," + str(X_taxi) + "," + str(Y_taxi) + "," + str(msg_sensor)+ ",nada"
-                            producer.send('TAXIS', value=coordenada.encode('utf-8'))
+                            coordenada_cifrada= cifrar(coordenada)
+                            print(coordenada_cifrada)
+                            coordenada_enviar=id_taxi +":"+coordenada_cifrada
+                            producer.send('TAXIS', value=coordenada_enviar.encode('utf-8'))
                             time.sleep(1)
                             # Actualizar el mapa cada vez que se envían coordenadas
                             dibujar_mapa()
 
                         else:
                             coordenada = str(id_taxi) + "," + str(X_taxi) + "," + str(Y_taxi) + "," + str(msg_sensor)+ ",nada"
-                            producer.send('TAXIS', value=coordenada.encode('utf-8'))
+                            coordenada_cifrada= cifrar(coordenada)
+                            print(coordenada_cifrada)
+                            coordenada_enviar=id_taxi +":"+coordenada_cifrada
+                            producer.send('TAXIS', value=coordenada_enviar.encode('utf-8'))
                             time.sleep(1)
                             # Actualizar el mapa cada vez que se envían coordenadas
                             dibujar_mapa()
 
                 else:
                     coordenada = str(id_taxi) + "," + str(X_taxi) + "," + str(Y_taxi) + "," + str(msg_sensor) + ",nada"
-                    producer.send('TAXIS', value=coordenada.encode('utf-8'))
+                    coordenada_cifrada= cifrar(coordenada)
+                    print(coordenada_cifrada)
+                    coordenada_enviar=id_taxi +":"+coordenada_cifrada
+                    producer.send('TAXIS', value=coordenada_enviar.encode('utf-8'))
                     time.sleep(1)
                     # Actualizar el mapa cada vez que se envían coordenadas
                     dibujar_mapa()
@@ -122,12 +167,18 @@ def recibir_central(broker):
                     if central == "Parar":
                         Central_para = True
                         coordenada = str(id_taxi) + "," + str(X_taxi) + "," + str(Y_taxi) + "," + str(msg_sensor) + ",parado"
-                        producer.send('TAXIS', value=coordenada.encode('utf-8'))
+                        coordenada_cifrada= cifrar(coordenada)
+                        print(coordenada_cifrada)
+                        coordenada_enviar=id_taxi +":"+coordenada_cifrada
+                        producer.send('TAXIS', value=coordenada_enviar.encode('utf-8'))
                         time.sleep(1)
                     elif central== "Seguir":
                         Central_para = False
                         coordenada = str(id_taxi) + "," + str(X_taxi) + "," + str(Y_taxi) + "," + str(msg_sensor) + ",sigue"
-                        producer.send('TAXIS', value=coordenada.encode('utf-8'))
+                        coordenada_cifrada= cifrar(coordenada)
+                        print(coordenada_cifrada)
+                        coordenada_enviar=id_taxi +":"+coordenada_cifrada
+                        producer.send('TAXIS', value=coordenada_enviar.encode('utf-8'))
                         time.sleep(1)
                     else:
                         destinoX = int(partes[1])
@@ -337,8 +388,11 @@ if __name__ == "__main__":
                 producercliente.send('TAXI-CLIENTE',value=mensaje_cliente.encode('utf-8'))
                 sacar_taxi(int(sys.argv[5]))
                 sacar_token(int(sys.argv[5]))
+                os._exit(1)
             except KeyboardInterrupt:
                 print("sale segundo keyinterrup")
+                sacar_taxi(int(sys.argv[5]))
+                sacar_token(int(sys.argv[5]))
                 os._exit(1)
 
     

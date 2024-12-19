@@ -3,6 +3,7 @@ import pandas as pd
 from sqlalchemy import create_engine
 import pymysql
 import secrets
+import os
 
 
 #================================================
@@ -37,15 +38,6 @@ def obtener_engine():
     base_datos = "bbdd"
     return create_engine(f"mysql+pymysql://{usuario}:{contraseña}@{servidor}:{puerto}/{base_datos}")
 
-#================================================
-def generarToken(id):
-    conexion = conectar_bd()
-    cursor = conexion.cursor()
-    token = secrets.token_hex(16)
-    cursor.execute(f"UPDATE encriptado SET taxis = (?) WHERE id = (?)",(id,token,))
-    conexion.commit()
-    conexion.close()
-
 
 #================================================================================================
 def coordX_taxi(id_taxi):
@@ -71,7 +63,19 @@ def coordY_taxi(id_taxi):
     cursor.close()
     conexion.close()
     return int(coordenada)
-
+def get_clave(taxi):
+    conexion = conectar_bd()
+    cursor = conexion.cursor()
+    # Consulta SQL para obtener la clave según el ID del taxi
+    consulta = "SELECT clave FROM encriptado WHERE taxi = %s"
+    cursor.execute(consulta, (taxi,))
+    resultado = cursor.fetchone()
+    
+    # Si se encuentra el taxi, devuelve la clave
+    if resultado:
+        return resultado[0]
+    else:
+        return None
 def sacar_token(id_taxi):
     conexion = conectar_bd()
     cursor = conexion.cursor()
@@ -111,11 +115,12 @@ def buscar_taxi_activo(msg):
     
 def asignarToken(id_taxi):
     token = secrets.token_hex(16)
+    clave=os.urandom(16).hex()
     conexion = conectar_bd()
     cursor = conexion.cursor()
     conexion = conectar_bd()
     cursor = conexion.cursor()
-    cursor.execute("INSERT INTO encriptado (taxi, token, clave) VALUES (%s, %s, %s)", (id_taxi, token, 2))
+    cursor.execute("INSERT INTO encriptado (taxi, token, clave) VALUES (%s, %s, %s)", (id_taxi, token, clave))
     conexion.commit()
     cursor.close()
     conexion.close()  
