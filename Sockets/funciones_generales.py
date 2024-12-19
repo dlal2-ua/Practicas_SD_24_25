@@ -86,9 +86,10 @@ def sacar_token(id_taxi):
 def saca_solo_token(id_taxi):
     conexion = conectar_bd()
     cursor = conexion.cursor()
-    query = "UPDATE encriptado SET token = 'vacio' WHERE taxi = %s"
-    cursor.execute(query, (id_taxi))
+    query = "UPDATE encriptado SET token = NULL WHERE taxi = %s"
+    cursor.execute(query, (id_taxi,))  # Asegúrate de incluir la coma aquí para formar una tupla
     conexion.commit()
+
     cursor.close()
     conexion.close()
 def sacar_taxi(id_taxi):

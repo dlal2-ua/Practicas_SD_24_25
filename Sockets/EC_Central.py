@@ -652,13 +652,16 @@ def manejar_ciudad_ko():
                     actualizar_tabla_taxis(taxi_id)
 
                     if destino_a_final is not None:
-                        #saca_solo_token(taxi_id)
+                        saca_solo_token(taxi_id)
                         volver_base(broker, taxi_id, coord_x, coord_y, destino_a_cliente)
+                        
                         redirector.log(f"Taxi {taxi_id} ha sido enviado a la base.\n")
                         insertar_auditoria("INFO", f"Taxi {taxi_id} ha sido enviado a la base.")
                     else:
-                        #saca_solo_token(taxi_id)
+                        saca_solo_token(taxi_id)
+
                         volver_base2(broker, taxi_id, coord_x, coord_y)
+                        
                         redirector.log(f"Taxi {taxi_id} ha sido enviado a la base.\n")
                         insertar_auditoria("INFO", f"Taxi {taxi_id} ha sido enviado a la base.")
 

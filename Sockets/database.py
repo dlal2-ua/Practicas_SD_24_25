@@ -51,8 +51,8 @@ CREATE TABLE IF NOT EXISTS pos_inicial_cliente (
 cursor.execute('''
 CREATE TABLE IF NOT EXISTS encriptado (
     taxi INT PRIMARY KEY,
-    token VARCHAR(64) NOT NULL,
-    clave VARCHAR(64) NOT NULL
+    token VARCHAR(64) ,
+    clave VARCHAR(64)
 )
 ''')
 cursor.execute('''
