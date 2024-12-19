@@ -83,7 +83,14 @@ def sacar_token(id_taxi):
     conexion.commit()
     cursor.close()
     conexion.close()
-
+def saca_solo_token(id_taxi):
+    conexion = conectar_bd()
+    cursor = conexion.cursor()
+    query = "UPDATE encriptado SET token = 'vacio' WHERE taxi = %s"
+    cursor.execute(query, (id_taxi))
+    conexion.commit()
+    cursor.close()
+    conexion.close()
 def sacar_taxi(id_taxi):
     conexion = conectar_bd()
     cursor = conexion.cursor()
@@ -115,16 +122,30 @@ def buscar_taxi_activo(msg):
     
 def asignarToken(id_taxi):
     token = secrets.token_hex(16)
-    clave=os.urandom(16).hex()
     conexion = conectar_bd()
     cursor = conexion.cursor()
-    conexion = conectar_bd()
-    cursor = conexion.cursor()
-    cursor.execute("INSERT INTO encriptado (taxi, token, clave) VALUES (%s, %s, %s)", (id_taxi, token, clave))
+    cursor.execute("INSERT INTO encriptado (taxi, token, clave) VALUES (%s, %s, 'vacio')", (id_taxi, token,))
     conexion.commit()
     cursor.close()
     conexion.close()  
-
+def asignarClave(id_taxi):
+    clave=os.urandom(16).hex()
+    conexion = conectar_bd()
+    cursor = conexion.cursor()
+    query = "UPDATE encriptado SET clave = %s WHERE taxi = %s"
+    cursor.execute(query, (clave, id_taxi))
+    conexion.commit()
+    cursor.close()
+    conexion.close()
+def actualizar_token(id_taxi):
+    token = secrets.token_hex(16)
+    conexion = conectar_bd()
+    cursor = conexion.cursor()
+    query = "UPDATE encriptado SET token = %s WHERE taxi = %s"
+    cursor.execute(query, (token, id_taxi))
+    conexion.commit()
+    cursor.close()
+    conexion.close()
 def autentificar_taxi(id_taxi):
     conexion = conectar_bd()
     cursor = conexion.cursor()

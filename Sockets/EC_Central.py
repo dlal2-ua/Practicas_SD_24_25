@@ -652,12 +652,12 @@ def manejar_ciudad_ko():
                     actualizar_tabla_taxis(taxi_id)
 
                     if destino_a_final is not None:
-                        sacar_token(taxi_id)
+                        #saca_solo_token(taxi_id)
                         volver_base(broker, taxi_id, coord_x, coord_y, destino_a_cliente)
                         redirector.log(f"Taxi {taxi_id} ha sido enviado a la base.\n")
                         insertar_auditoria("INFO", f"Taxi {taxi_id} ha sido enviado a la base.")
                     else:
-                        sacar_token(taxi_id)
+                        #saca_solo_token(taxi_id)
                         volver_base2(broker, taxi_id, coord_x, coord_y)
                         redirector.log(f"Taxi {taxi_id} ha sido enviado a la base.\n")
                         insertar_auditoria("INFO", f"Taxi {taxi_id} ha sido enviado a la base.")
@@ -698,12 +698,15 @@ def manejar_ciudad_ok():
 
                 #cambiar_estado_TAXI_ciudad_ok(taxi_id)
                 if estado == 0 and destino_a_cliente is not None:
-                    asignarToken(taxi_id)
+                    actualizar_token(taxi_id)
+    
                     reanudar_no_congelado(broker, taxi_id, coord_x, coord_y, pasajero, destino_a_cliente, destino_a_final)
                     redirector.log(f"Taxi {taxi_id} ha sido reanudado después de congelación.\n")
                     insertar_auditoria("INFO", f"Taxi {taxi_id} ha sido reanudado despues de congelación.")
                 elif estado == 0 and destino_a_cliente is None:
-                    asignarToken(taxi_id)
+                    actualizar_token(taxi_id)
+                    
+                    
                     poner_taxi_disponible(taxi_id)
                     redirector.log(f"Taxi {taxi_id} ha sido puesto disponible después de congelación.\n")
                     insertar_auditoria("INFO", f"Taxi {taxi_id} ha sido puesto disponible después de congelación.")
@@ -862,6 +865,7 @@ def handle_client(addr,broker,connstream):
         print(msg)
         autentificar_taxi(msg)
         asignarToken(msg)
+        asignarClave(msg)
         print(f"El taxi con id {msg} está autentificado")
         redirector.log(f"El taxi con id {msg} está autentificado\n")
         connstream.send("Taxi correctamente autentificado".encode(FORMAT))
