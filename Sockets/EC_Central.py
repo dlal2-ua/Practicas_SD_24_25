@@ -1,4 +1,4 @@
-import socket
+import socket, ssl
 import threading
 import sys
 from kafka import KafkaConsumer, KafkaProducer
@@ -833,24 +833,28 @@ def iniciar_central(broker):
 #=======================================================================================================================================================================
 
 
-def handle_client(conn, addr,broker):
+def handle_client(addr,broker,connstream):
     conexion = conectar_bd()
+    
     global msg
-    msg = conn.recv(1024).decode(FORMAT)
+    msg = connstream.recv(1024).decode(FORMAT)
     if buscar_taxi_arg(msg):
         autentificar_taxi(msg)
         asignarToken(msg)
         print(f"El taxi con id {msg} está autentificado")
         redirector.log(f"El taxi con id {msg} está autentificado\n")
-        conn.send("Taxi correctamente autentificado".encode(FORMAT))
+        connstream.send("Taxi correctamente autentificado".encode(FORMAT))
 
     else:
         print(f"Se ha intentado conectar el taxi con id {msg} pero no ha sido posible")
         redirector.log(f"Se ha intentado conectar el taxi con id {msg} pero no ha sido posible\n")
-        conn.send("Este taxi no se puede registrar en la bbdd".encode(FORMAT))
-    conn.close()
+        connstream.send("Este taxi no se puede autentificar en la bbdd".encode(FORMAT))
+    connstream.close()
 
 def start(broker):
+    cert = 'SocketAuth.pem'
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    context.load_cert_chain(cert, cert)
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     #SERVER = obtener_ip()
     SERVER = socket.gethostbyname(socket.gethostname())
@@ -860,8 +864,9 @@ def start(broker):
 
 
     while server_active:
-        conn, addr = server.accept()
-        handle_client(conn,addr,broker)
+        newsocket, addr = server.accept()
+        connstream = context.wrap_socket(newsocket, server_side=True)
+        handle_client(addr,broker,connstream)
     server.close()
     print("Servidor cerrado correctamente.")
     redirector.log("Servidor cerrado correctamente.\n")

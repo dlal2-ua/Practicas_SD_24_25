@@ -71,15 +71,15 @@ appSD.get("/taxis/:id", (request, response) => {
     // Consulta para obtener el taxi con el id especificado
     const sql = 'SELECT * FROM taxis WHERE id = ?';
 
-    // Ejecutar la consulta en la base de datos SQLite
-    connection.query(sql,(error,rows) => {
+    // Ejecutar la consulta en la base de datos MySQL
+    connection.query(sql, [id], (error, rows) => {
         if (error) {
             console.error("Error ejecutando la consulta:", error.message);
             response.status(500).send("Error en la base de datos");
             return;
         }
 
-        if (row) {
+        if (rows.length > 0) { // Verificar si se encontraron resultados
             response.json(rows); // Devolver el resultado como JSON
         } else {
             response.status(404).send("Taxi no encontrado");
@@ -90,28 +90,34 @@ appSD.post("/taxis", (request, response) => {
     console.log("Añadir nuevo taxi");
 
     // Consulta para insertar un nuevo taxi solo con el id
-    const sql = "INSERT INTO taxis (id, destino_a_cliente, destino_a_final, estado, coordX, coordY, pasajero) VALUES (?, NULL, NULL, NULL, 1, 1, 0)";
+    const sql = `
+        INSERT INTO taxis (id, destino_a_cliente, destino_a_final, estado, coordX, coordY, pasajero) 
+        VALUES (?, NULL, NULL, NULL, 1, 1, 0)
+    `;
 
     // Obtener el id del cuerpo de la solicitud
     const { id } = request.body;
 
+    // Validar que el campo 'id' exista
     if (!id) {
         return response.status(400).send("El campo 'id' es obligatorio");
     }
 
     // Ejecutar la consulta
-    connection.query(sql,(error,response) => {
-
+    connection.query(sql, [id], (error, results) => {
         if (error) {
-            if(error.message == "SQLITE_CONSTRAINT: UNIQUE constraint failed: taxis.id") {
-                console.error("Error al registrar un taxi ya registrado en la base de datos")
-                return response.status(500).send("Este taxi ya está registrado")
+            // Manejar error de restricción UNIQUE
+            if (error.code === "SQLITE_CONSTRAINT") {
+                console.error("Error: El ID del taxi ya existe en la base de datos");
+                return response.status(409).send("Este taxi ya está registrado");
             }
+
             console.error("Error al insertar en la base de datos:", error.message);
             return response.status(500).send("Error en la base de datos");
         }
 
-        response.send(`Taxi creado con ID: ${id}`);
+        // Responder con éxito
+        response.status(201).send(`Taxi creado con ID: ${id}`);
     });
 });
 appSD.delete("/taxis/:id", (request, response) => {
@@ -124,13 +130,14 @@ appSD.delete("/taxis/:id", (request, response) => {
     const sql = "DELETE FROM taxis WHERE id = ?";
 
     // Ejecutar la consulta
-    connection.query(sql,(error,response) => {
+    connection.query(sql, [id], (error, results) => {
         if (error) {
             console.error("Error al eliminar en la base de datos:", error.message);
             return response.status(500).send("Error en la base de datos");
         }
 
-        if (this.changes > 0) {
+        // Verificar si alguna fila fue eliminada
+        if (results.affectedRows > 0) {
             response.send(`Taxi con ID: ${id} eliminado`);
         } else {
             response.status(404).send("Taxi no encontrado");
