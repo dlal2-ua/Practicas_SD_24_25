@@ -101,17 +101,13 @@
             opacity: 0.85;
         }
 
-        /* Estilo para los taxis azules */
-.taxi-azul {
-    background-color: blue;
-    color: white;
-}
     
         /* Colores para los elementos */
         .taxi { background-color: red; color: white; }
         .taxi-verde { background-color: green; color: white; } /* Añadimos la clase verde */
         .cliente { background-color: yellow; color: black; }
         .destino { background-color: darkblue; color: white; }
+        .taxi-azul { background-color: blue; color: white; }
     
         /* Contenedor de logs (a la derecha) */
         .contenedor-logs {
@@ -339,51 +335,51 @@ function dibujarDatos(datos) {
 
         // Actualizar tablas
         function actualizarTablas(datos) {
-    const taxis = datos.taxis; // Ahora obtenemos los taxis directamente de datos.taxis
-    const clientes = datos.clientes; // Los clientes vienen de datos.clientes
+            const taxis = datos.taxis; // Ahora obtenemos los taxis directamente de datos.taxis
+            const clientes = datos.clientes; // Los clientes vienen de datos.clientes
 
-    tablaTaxis.innerHTML = `
-        <tr>
-            <th>ID</th>
-            <th>DESTINO</th>
-            <th>ESTADO</th>
-            <th>COORD_X</th>
-            <th>COORD_Y</th>
-        </tr>
-    `;
+            tablaTaxis.innerHTML = `
+                <tr>
+                    <th>ID</th>
+                    <th>DESTINO</th>
+                    <th>ESTADO</th>
+                    <th>COORD_X</th>
+                    <th>COORD_Y</th>
+                </tr>
+            `;
 
-    taxis.forEach(taxi => {
-        const destino = taxi.pasajero === 1 ? (taxi.destino_a_final || '-') : (taxi.destino_a_cliente || '-');
-        const estado = obtenerEstadoTaxi(taxi.estado); // Usamos la función obtenerEstadoTaxi para el estado
-        tablaTaxis.innerHTML += `
-            <tr>
-                <td>${taxi.id}</td>
-                <td>${destino}</td>
-                <td>${estado}</td>
-                <td>${taxi.x}</td>
-                <td>${taxi.y}</td>
-            </tr>
-        `;
-    });
+            taxis.forEach(taxi => {
+                const destino = taxi.pasajero === 1 ? (taxi.destino_a_final || '-') : (taxi.destino_a_cliente || '-');
+                const estado = obtenerEstadoTaxi(taxi.estado); // Usamos la función obtenerEstadoTaxi para el estado
+                tablaTaxis.innerHTML += `
+                    <tr>
+                        <td>${taxi.id}</td>
+                        <td>${destino}</td>
+                        <td>${estado}</td>
+                        <td>${taxi.x}</td>
+                        <td>${taxi.y}</td>
+                    </tr>
+                `;
+            });
 
-    tablaClientes.innerHTML = `
-        <tr>
-            <th>ID</th>
-            <th>DESTINO</th>
-            <th>ESTADO</th>
-        </tr>
-    `;
+            tablaClientes.innerHTML = `
+                <tr>
+                    <th>ID</th>
+                    <th>DESTINO</th>
+                    <th>ESTADO</th>
+                </tr>
+            `;
 
-    clientes.forEach(cliente => {
-        tablaClientes.innerHTML += `
-            <tr>
-                <td>${cliente.id}</td>
-                <td>${cliente.destino || 'N/A'}</td>
-                <td>${cliente.estado}</td>
-            </tr>
-        `;
-    });
-}
+            clientes.forEach(cliente => {
+                tablaClientes.innerHTML += `
+                    <tr>
+                        <td>${cliente.id}</td>
+                        <td>${cliente.destino || 'N/A'}</td>
+                        <td>${cliente.estado}</td>
+                    </tr>
+                `;
+            });
+        }
 
 
         // Iniciar actualización
