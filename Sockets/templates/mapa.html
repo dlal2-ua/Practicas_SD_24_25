@@ -268,69 +268,66 @@ function dibujarDatos(datos) {
         cell.textContent = '';    // Limpiamos el contenido de las celdas
     });
 
-    // Primero dibujamos los taxis
-    datos.forEach(item => {
+    const estadoCiudad = datos.estado_ciudad; // Obtener el estado de la ciudad
+    const taxis = datos.taxis;
+    const clientes = datos.clientes;
+
+    // Primero, marcamos los taxis
+    taxis.forEach(item => {
         const index = (item.y - 1) * 20 + (item.x - 1);
         const cell = cells[index];
         if (cell) {
-            if (item.tipo === "taxi") {
-                // Si el taxi tiene estado "congelado", lo mostramos en azul
-                if (item.color === "azul") {
-                    cell.classList.add('taxi', 'taxi-azul'); // Añadimos clase 'taxi-azul'
-                } else {
-                    // Si no está congelado, lo mostramos con el color normal
-                    if (item.estado === 0) {
-                        cell.classList.add('taxi', 'taxi-verde');
-                    } else {
-                        cell.classList.add('taxi');
-                    }
+            if (estadoCiudad === 1) {
+                // Ciudad KO: taxis azules
+                cell.classList.add('taxi-azul');
+            } else {
+                if (item.estado === 0 || item.estado === 0)
+                    // Ciudad OK: taxis verdes
+                    cell.classList.add('taxi-verde');
+                else{
+                    cell.classList.add('taxi');
                 }
+            }
 
-                // Comprobar si el cliente está en las mismas coordenadas que el taxi
-                const cliente = datos.find(cliente => cliente.tipo === 'cliente' && 
-                    cliente.x === item.x && 
-                    cliente.y === item.y &&
-                    cliente.id === item.destino_a_cliente); // Verificamos que el cliente es el correcto
+            // Comprobar si el taxi y el cliente están en las mismas coordenadas
+            const cliente = clientes.find(cliente =>
+                cliente.x === item.x &&
+                cliente.y === item.y &&
+                cliente.id === item.destino_a_cliente
+            );
 
-                if (cliente) {
-                    cell.textContent = `${item.id}-${cliente.id}`; // Mostrar "id del taxi-id del cliente"
-                    
-                    // Limpiar al cliente del mapa (eliminamos la celda correspondiente)
-                    const clienteCell = document.querySelector(`[data-index="${(cliente.y - 1) * 20 + (cliente.x - 1)}"]`);
-                    if (clienteCell) {
-                        clienteCell.textContent = ''; // Limpiamos la celda del cliente
-                    }
-                } else {
-                    cell.textContent = `${item.id}`; // Solo mostramos el id del taxi
+            if (cliente) {
+                cell.textContent = `${item.id}-${cliente.id}`; // Mostrar "id del taxi-id del cliente"
+
+                // Eliminar cliente del mapa
+                const clienteIndex = (cliente.y - 1) * 20 + (cliente.x - 1);
+                const clienteCell = cells[clienteIndex];
+                if (clienteCell) {
+                    clienteCell.textContent = ''; // Limpiar celda del cliente
                 }
+            } else {
+                cell.textContent = `${item.id}`; // Solo mostramos el id del taxi
             }
         }
     });
 
-    // Luego, dibujamos los clientes, asegurándonos de que no estén en la misma posición que un taxi
-    datos.forEach(item => {
-        if (item.tipo === "cliente") {
-            const taxiEnPosicion = datos.find(taxi => taxi.tipo === 'taxi' && taxi.x === item.x && taxi.y === item.y);
-            if (!taxiEnPosicion) {
-                const index = (item.y - 1) * 20 + (item.x - 1);
-                const cell = cells[index];
-                if (cell) {
-                    cell.classList.add('cliente');
-                    cell.textContent = `${item.id}`;
-                }
-            }
+    // Luego, dibujamos los clientes restantes
+    clientes.forEach(item => {
+        const index = (item.y - 1) * 20 + (item.x - 1);
+        const cell = cells[index];
+        if (cell) {
+            cell.classList.add('cliente');
+            cell.textContent = `${item.id}`;
         }
     });
 
     // Finalmente, dibujamos los destinos
-    datos.forEach(item => {
-        if (item.tipo === "destino") {
-            const index = (item.y - 1) * 20 + (item.x - 1);
-            const cell = cells[index];
-            if (cell) {
-                cell.classList.add('destino');
-                cell.textContent = `${item.nombre}`;
-            }
+    datos.destinos.forEach(item => {
+        const index = (item.y - 1) * 20 + (item.x - 1);
+        const cell = cells[index];
+        if (cell) {
+            cell.classList.add('destino');
+            cell.textContent = `${item.nombre}`;
         }
     });
 }
@@ -339,51 +336,55 @@ function dibujarDatos(datos) {
 
 
 
+
         // Actualizar tablas
         function actualizarTablas(datos) {
-            const taxis = datos.filter(item => item.tipo === "taxi");
-            const clientes = datos.filter(item => item.tipo === "cliente");
+    const taxis = datos.taxis; // Ahora obtenemos los taxis directamente de datos.taxis
+    const clientes = datos.clientes; // Los clientes vienen de datos.clientes
 
-            tablaTaxis.innerHTML = `
-                <tr>
-                    <th>ID</th>
-                    <th>DESTINO</th>
-                    <th>ESTADO</th>
-                    <th>COORD_X</th>
-                    <th>COORD_Y</th>
-                </tr>
-            `;
-            taxis.forEach(taxi => {
-                const destino = taxi.pasajero === 1 ? (taxi.destino_a_final || '-') : (taxi.destino_a_cliente || '-');
-                const estado = obtenerEstadoTaxi(taxi.estado);
-                tablaTaxis.innerHTML += `
-                    <tr>
-                        <td>${taxi.id}</td>
-                        <td>${destino}</td>
-                        <td>${estado}</td>
-                        <td>${taxi.x}</td>
-                        <td>${taxi.y}</td>
-                    </tr>
-                `;
-            });
+    tablaTaxis.innerHTML = `
+        <tr>
+            <th>ID</th>
+            <th>DESTINO</th>
+            <th>ESTADO</th>
+            <th>COORD_X</th>
+            <th>COORD_Y</th>
+        </tr>
+    `;
 
-            tablaClientes.innerHTML = `
-                <tr>
-                    <th>ID</th>
-                    <th>DESTINO</th>
-                    <th>ESTADO</th>
-                </tr>
-            `;
-            clientes.forEach(cliente => {
-                tablaClientes.innerHTML += `
-                    <tr>
-                        <td>${cliente.id}</td>
-                        <td>${cliente.destino || 'N/A'}</td>
-                        <td>${cliente.estado}</td>
-                    </tr>
-                `;
-            });
-        }
+    taxis.forEach(taxi => {
+        const destino = taxi.pasajero === 1 ? (taxi.destino_a_final || '-') : (taxi.destino_a_cliente || '-');
+        const estado = obtenerEstadoTaxi(taxi.estado); // Usamos la función obtenerEstadoTaxi para el estado
+        tablaTaxis.innerHTML += `
+            <tr>
+                <td>${taxi.id}</td>
+                <td>${destino}</td>
+                <td>${estado}</td>
+                <td>${taxi.x}</td>
+                <td>${taxi.y}</td>
+            </tr>
+        `;
+    });
+
+    tablaClientes.innerHTML = `
+        <tr>
+            <th>ID</th>
+            <th>DESTINO</th>
+            <th>ESTADO</th>
+        </tr>
+    `;
+
+    clientes.forEach(cliente => {
+        tablaClientes.innerHTML += `
+            <tr>
+                <td>${cliente.id}</td>
+                <td>${cliente.destino || 'N/A'}</td>
+                <td>${cliente.estado}</td>
+            </tr>
+        `;
+    });
+}
+
 
         // Iniciar actualización
         function iniciarActualizacion() {

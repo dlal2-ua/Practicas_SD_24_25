@@ -445,6 +445,23 @@ def cambiarEstadoClientes(estado):
     except mysql.connector.Error as e:
         print(f"Error al actualizar estado del cliente en la base de datos: {e}")
 
+def obtener_estado_cliente():
+    conexion = conectar_bd()
+    cursor = conexion.cursor()
+    cursor.execute("SELECT id, estado FROM clientes")
+    cliente = cursor.fetchall()
+    cursor.close()
+    conexion.close()
+    return cliente
+
+def actualizar_estado_cliente(cliente_id, estado):
+    conexion = conectar_bd()
+    cursor = conexion.cursor()
+    cursor.execute("UPDATE clientes SET estado = %s WHERE id = %s", (estado, cliente_id))
+    conexion.commit()
+    cursor.close()
+    conexion.close()
+
 
 def actualizar_destino_cliente(conexion, cliente_id, destino, estado):
     cursor = conexion.cursor()

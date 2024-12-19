@@ -44,7 +44,7 @@ def obtener_datos_mapa():
     clientes = cursor.fetchall()
     clientes_dict = [{"tipo": "cliente", "id": cliente[0], "x": cliente[1], "y": cliente[2], "destino": cliente[3], "estado": cliente[4]} for cliente in clientes]
 
-    #Obtener clientes_pos_inicial
+    # Obtener clientes_pos_inicial
     cursor.execute("SELECT id, coordX, coordY FROM pos_inicial_cliente")
     clientes_pos_inicial = cursor.fetchall()
     clientes_pos_inicial_dict = [{"tipo": "cliente_pos_inicial", "id": cliente[0], "x": cliente[1], "y": cliente[2]} for cliente in clientes_pos_inicial]
@@ -57,10 +57,15 @@ def obtener_datos_mapa():
     # Obtener estado de la ciudad
     cursor.execute("SELECT estado FROM estado_ciudad")  # Supongamos que la tabla se llama 'ciudad'
     estado_ciudad = cursor.fetchone()  # Se asume que solo hay una fila para la ciudad
-    estado_ciudad_dict = [{"tipo": "ciudad", "estado": estado_ciudad}]
+    estado_ciudad_dict = {"estado_ciudad": estado_ciudad[0] if estado_ciudad else 0}  # Devuelve 0 si no hay estado
 
     # Combinar todos los datos
-    mapa_data = taxis_dict + clientes_dict + destinos_dict + estado_ciudad_dict
+    mapa_data = {
+        "taxis": taxis_dict,
+        "clientes": clientes_dict,
+        "destinos": destinos_dict,
+        "estado_ciudad": estado_ciudad_dict["estado_ciudad"]
+    }
 
     cursor.close()
     conexion.close()
@@ -100,4 +105,4 @@ def ejecutar_menu():
 
 
 if __name__ == '__main__':
-    app.run(host="0.0.0.0", port=5000)
+    app.run(host="0.0.0.0", port=5000)  # Habilitar SSL   , ssl_context=('certServ.pem', 'certServ.pem')
