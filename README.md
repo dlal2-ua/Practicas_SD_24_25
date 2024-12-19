@@ -11,6 +11,10 @@ pip install git+https://github.com/dpkp/kafka-python.git
 ```
 ## BASE DE DATOS
 ```
+CREATE DATABASE bbdd;
+USE bbdd;
+```
+```
 CREATE USER 'root2'@'%' IDENTIFIED BY 'root';
 ```
 ```
