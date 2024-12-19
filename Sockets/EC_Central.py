@@ -607,13 +607,33 @@ def congelar_clientes():
 
 
 
-
+# Array para guardar los estados originales de los clientes
+estados_originales_clientes = []
 
 def manejar_ciudad_ko():
+    global estados_originales_clientes
     broker = devuelve_broker()
     print("Mandando todos los taxis a la base...")
     redirector.log("Mandando todos los taxis a la base...\n")
     insertar_auditoria("INFO", "Mandando todos los taxis a la base...")
+
+
+    # Guardar los estados originales de los clientes
+    try:
+        clientes = obtener_estado_cliente()
+        if clientes:  # Verificar si hay clientes en la base de datos
+            estados_originales_clientes = [
+                {"id": cliente[0], "estado": cliente[1]}  # Guardar id y estado de cada cliente
+                for cliente in clientes
+            ]
+            insertar_auditoria("INFO", "Estados originales de los clientes guardados correctamente.")
+        else:
+            print("No hay clientes disponibles para procesar.")
+    except Exception as e:
+        print(f"Error al guardar los estados originales de los clientes: {e}")
+        insertar_auditoria("ERROR", f"Error al guardar los estados originales de los clientes: {e}")
+
+
 
     #congelar_clientes()
     cambiarEstadoClientes("CONGELADO")
@@ -656,8 +676,21 @@ def manejar_ciudad_ko():
 
 
 def manejar_ciudad_ok():
+    global estados_originales_clientes
     broker = devuelve_broker()
     try:
+
+         # Restaurar los estados originales de los clientes
+        if estados_originales_clientes:
+            for cliente in estados_originales_clientes:
+                id_cliente = cliente["id"]
+                estado_original = cliente["estado"]
+                actualizar_estado_cliente(id_cliente, estado_original)
+                insertar_auditoria("INFO", f"Estado del cliente {id_cliente} restaurado a {estado_original}.")
+        else:
+            print("No se encontraron estados originales de clientes para restaurar.")
+
+
         taxis = obtener_datos_TAXI_ciudad()
         if taxis:  # Comprobamos si hay taxis en la base de datos
             for taxi in taxis:
