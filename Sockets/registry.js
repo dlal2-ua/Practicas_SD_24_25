@@ -144,3 +144,25 @@ appSD.delete("/taxis/:id", (request, response) => {
         }
     });
 });
+appSD.get("/clave/:id", (request, response) => {
+    const { id } = request.params; // Obtener el id de los parámetros de la URL
+    console.log(`Accediendo a la clave del taxi con id: ${id}`);
+
+    // Consulta para obtener el taxi con el id especificado
+    const sql = 'SELECT clave FROM encriptado WHERE taxi = ?';
+
+    // Ejecutar la consulta en la base de datos MySQL
+    connection.query(sql, [id], (error, rows) => {
+        if (error) {
+            console.error("Error ejecutando la consulta:", error.message);
+            response.status(500).send("Error en la base de datos");
+            return;
+        }
+
+        if (rows.length > 0) { // Verificar si se encontraron resultados
+            response.json(rows); // Devolver el resultado como JSON
+        } else {
+            response.status(404).send("Taxi no encontrado");
+        }
+    });
+});

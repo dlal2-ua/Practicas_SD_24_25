@@ -18,7 +18,10 @@ from colorama import Fore, init
 import CTC_auxiliar
 import io
 import requests
-
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.primitives import padding
+from cryptography.hazmat.backends import default_backend
+import base64
 """
 En Python, no se puede manejr señales (como SIGINT o SIGTERM) en hilos secundarios.
 puedes manejar las señales comao SIGINT en el hilo principal y luego comunicar este evento a los 
@@ -103,6 +106,19 @@ def manejar_cierre(signal, frame):
     os._exit(0)  # Salir inmediatamente de todo el programa sin limpieza
     os.kill(0, signal.SIGKILL)  # Forzar la terminación de todos los procesos secundarios
 
+def descifrar(mensaje,taxi):
+    clave = get_clave(taxi)
+    clave_bytes = clave.encode()
+
+    ciphertext_bytes = base64.b64decode(mensaje)
+    
+    cipher = Cipher(algorithms.AES(clave_bytes), modes.ECB(), backend=default_backend())
+    decryptor = cipher.decryptor()
+    padded_message = decryptor.update(ciphertext_bytes) + decryptor.finalize()
+    
+    unpadder = padding.PKCS7(128).unpadder()
+    message = unpadder.update(padded_message) + unpadder.finalize()
+    return message.decode()
 
 # Función para imprimir la tabla de clientes solo si hay datos
 def imprimir_tabla_clientes():
@@ -238,16 +254,16 @@ def hilo_lector_cliente(broker, cola_mensajes):
                 cliente_id = partes[1].strip("'")  # Extraer ID del cliente sin las comillas
                 destino = partes[-1]  # El último valor es el destino
                 
-                """
-                # Verificar si el cliente ya está en servicio en la base de datos
-                if cliente_en_servicio(conexion, cliente_id):  # Asume que devuelve True si el cliente está en servicio
-                    # Enviar mensaje de "YA_ESTAS_EN_SERVICIO" al cliente
-                    mensaje_servicio_activo = "YA_ESTAS_EN_SERVICIO"
-                    producer.send('CENTRAL-CLIENTE', key=cliente_id.encode('utf-8'), value=mensaje_servicio_activo.encode('utf-8'))
-                    producer.flush()
-                    print(f"Cliente {cliente_id} ya está en servicio. Mensaje enviado al cliente.")
-                    continue  # No procesar más solicitudes para este cliente
-                """
+                
+                # # Verificar si el cliente ya está en servicio en la base de datos
+                # if cliente_en_servicio(conexion, cliente_id):  # Asume que devuelve True si el cliente está en servicio
+                #     # Enviar mensaje de "YA_ESTAS_EN_SERVICIO" al cliente
+                #     mensaje_servicio_activo = "YA_ESTAS_EN_SERVICIO"
+                #     producer.send('CENTRAL-CLIENTE', key=cliente_id.encode('utf-8'), value=mensaje_servicio_activo.encode('utf-8'))
+                #     producer.flush()
+                #     print(f"Cliente {cliente_id} ya está en servicio. Mensaje enviado al cliente.")
+                #     continue  # No procesar más solicitudes para este cliente
+                
             
                 if (buscarCliente(conexion, cliente_id) == False):
                     # Abre la conexión a la base de datos para agregar el cliente
@@ -329,20 +345,20 @@ def hilo_enviar_coordenadas_taxi(cliente_id, taxi_id, coordX_cliente, coordY_cli
     
     #print(f"Enviadas al taxi {taxi_id} las coordenadas de recogida del cliente {cliente_id}: ({coordX_cliente}, {coordY_cliente})")
 
-
-
-
-
-
 # Función para escuchar las coordenadas de los taxis y procesar si ha llegado al cliente o destino
 def hilo_lector_taxis(broker):
     consumer = KafkaConsumer('TAXIS', bootstrap_servers=broker)
     while central_activa:
         for message in consumer:
             mensaje = message.value.decode('utf-8')
-            #print(f"Mensaje recibido del taxi: {mensaje}")
+            print(f"Mensaje recibido del taxi: {mensaje}")
+            dividir = mensaje.split(":")
+            id=dividir[0]
+            mensaje_cifrado = dividir[1]
+            descifrado = descifrar(mensaje_cifrado,id)
+            print(descifrado)
             try:
-                partes = mensaje.split(",")
+                partes = descifrado.split(",")
                 taxi_id = int(partes[0])
                 coordX_taxi = int(partes[1])
                 coordY_taxi = int(partes[2])
@@ -636,10 +652,12 @@ def manejar_ciudad_ko():
                     actualizar_tabla_taxis(taxi_id)
 
                     if destino_a_final is not None:
+                        sacar_token(taxi_id)
                         volver_base(broker, taxi_id, coord_x, coord_y, destino_a_cliente)
                         redirector.log(f"Taxi {taxi_id} ha sido enviado a la base.\n")
                         insertar_auditoria("INFO", f"Taxi {taxi_id} ha sido enviado a la base.")
                     else:
+                        sacar_token(taxi_id)
                         volver_base2(broker, taxi_id, coord_x, coord_y)
                         redirector.log(f"Taxi {taxi_id} ha sido enviado a la base.\n")
                         insertar_auditoria("INFO", f"Taxi {taxi_id} ha sido enviado a la base.")
@@ -680,10 +698,12 @@ def manejar_ciudad_ok():
 
                 #cambiar_estado_TAXI_ciudad_ok(taxi_id)
                 if estado == 0 and destino_a_cliente is not None:
+                    asignarToken(taxi_id)
                     reanudar_no_congelado(broker, taxi_id, coord_x, coord_y, pasajero, destino_a_cliente, destino_a_final)
                     redirector.log(f"Taxi {taxi_id} ha sido reanudado después de congelación.\n")
                     insertar_auditoria("INFO", f"Taxi {taxi_id} ha sido reanudado despues de congelación.")
                 elif estado == 0 and destino_a_cliente is None:
+                    asignarToken(taxi_id)
                     poner_taxi_disponible(taxi_id)
                     redirector.log(f"Taxi {taxi_id} ha sido puesto disponible después de congelación.\n")
                     insertar_auditoria("INFO", f"Taxi {taxi_id} ha sido puesto disponible después de congelación.")
@@ -839,6 +859,7 @@ def handle_client(addr,broker,connstream):
     global msg
     msg = connstream.recv(1024).decode(FORMAT)
     if buscar_taxi_arg(msg):
+        print(msg)
         autentificar_taxi(msg)
         asignarToken(msg)
         print(f"El taxi con id {msg} está autentificado")
