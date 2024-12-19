@@ -9,6 +9,22 @@ bin\windows\kafka-server-start.bat .\config\server.properties
 ```
 pip install git+https://github.com/dpkp/kafka-python.git
 ```
+## BASE DE DATOS
+```
+CREATE USER 'root2'@'%' IDENTIFIED BY 'root';
+```
+```
+ALTER USER 'root2'@'%' IDENTIFIED WITH mysql_native_password BY 'root';
+```
+```
+GRANT ALL PRIVILEGES ON *.* TO 'root2'@'%' WITH GRANT OPTION;
+```
+```
+FLUSH PRIVILEGES;
+```
+```
+COMMIT;
+```
 
 ## Crear un topico en kafka
 ```
